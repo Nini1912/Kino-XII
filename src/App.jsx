@@ -1,8 +1,7 @@
-import { Routes, Route, Link } from "react-router-dom";
-
-function HomePage() {
-  return <h1>Home Page</h1>;
-}
+import { Routes, Route } from "react-router-dom";
+import Navbar from "./components/layout/Navbar";
+import Footer from "./components/layout/Footer";
+import HomePage from "./pages/HomePage";
 
 function SessionsPage() {
   return <h1>Sessions Page</h1>;
@@ -19,13 +18,7 @@ function ProfilePage() {
 export default function App() {
   return (
     <>
-      <nav className="navbar">
-        <Link to="/" className="logo">
-          KINO <span>XII</span>
-        </Link>
-
-        <Link to="/sessions">SESSIONS</Link>
-      </nav>
+      <Navbar />
 
       <Routes>
         <Route path="/" element={<HomePage />} />
@@ -33,6 +26,8 @@ export default function App() {
         <Route path="/movies/:id" element={<MovieDetailsPage />} />
         <Route path="/profile" element={<ProfilePage />} />
       </Routes>
+
+      <Footer />
     </>
   );
 }
