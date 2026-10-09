@@ -2,6 +2,8 @@ import { Routes, Route } from "react-router-dom";
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
 import HomePage from "./pages/HomePage";
+import LoginModal from "./components/auth/LoginModal";
+import RegisterModal from "./components/auth/RegisterModal";
 
 function SessionsPage() {
   return <h1>Sessions Page</h1>;
@@ -28,6 +30,8 @@ export default function App() {
       </Routes>
 
       <Footer />
+      <LoginModal />
+      <RegisterModal />
     </>
   );
 }
