@@ -10,6 +10,7 @@ import {
   getTicketTypes,
   normalizeSections,
 } from "./seatLayout.jsx";
+import { parseApiError } from "../../utils/apiErrors";
 
 const holdKey = (id) => `kino_hold_${id}`;
 const emptyForm = {
@@ -492,17 +493,27 @@ async function updateHold() {
       queryClient.invalidateQueries({ queryKey: ["booking-seats", sessionId] });
     } catch (err) {
       const status = err.response?.status;
-      if (status === 409) await handleConflict(err);
-      else if (
-        status === 422 &&
-        !err.response?.data?.errors &&
-        /hold|expired/i.test(getError(err))
-      )
-        await resetExpired();
-      else {
-        setError(getError(err));
-        setFieldErrors(err.response?.data?.errors ?? {});
-        if (status === 401) openLogin();
+      const parsed = parseApiError(err);
+
+      if (status === 409) {
+        await handleConflict(err);
+      } else if (parsed.type === "validation") {
+        setFieldErrors(parsed.fieldErrors);
+        setError("");
+      } else if (parsed.type === "rule") {
+        const isExpiredHold = /hold|expired/i.test(parsed.message);
+
+        if (isExpiredHold) {
+          await resetExpired();
+          setError(parsed.message);
+        } else {
+          setError(parsed.message);
+        }
+      } else if (status === 401) {
+        openLogin();
+        setError("Please log in again to continue.");
+      } else {
+        setError(parsed.message);
       }
     } finally {
       setBusy(false);
