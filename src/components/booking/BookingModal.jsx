@@ -139,6 +139,10 @@ export default function BookingModal({ sessionId, onClose }) {
   const closingRef = useRef(false);
   const holdRef = useRef(null);
   const expiryHandledRef = useRef(false);
+  const requestLockRef = useRef(false);
+  const [restorationStatus, setRestorationStatus] = useState(() =>
+    sessionStorage.getItem(holdKey(sessionId)) ? "pending" : "idle",
+  );
   const sessionQuery = useQuery({
     queryKey: ["booking-session", sessionId],
     queryFn: () => bookingApi.session(sessionId),
@@ -261,7 +265,16 @@ export default function BookingModal({ sessionId, onClose }) {
         setStep("checkout");
       } catch (err) {
         if (cancelled) return;
+
+        if (!saved?.isLive || isHoldExpired(saved)) {
+          setRestorationStatus("idle");
+          await resetExpired();
+          return;
+        }
+
+        setRestorationStatus("ready");
         if ([404, 410].includes(err.response?.status)) {
+          setRestorationStatus("idle");
           sessionStorage.removeItem(holdKey(sessionId));
           setHold(null);
           holdRef.current = null;
@@ -270,6 +283,7 @@ export default function BookingModal({ sessionId, onClose }) {
           setStep("seats");
           setError("Your previous reservation is no longer available.");
         } else {
+          setRestorationStatus("error");
           setError(
             "Could not restore your reservation. Please check your connection and reload.",
           );
@@ -441,7 +455,18 @@ export default function BookingModal({ sessionId, onClose }) {
       setError("That session has already started. Choose another showtime.");
       return;
     }
-    if (!validSelected.length || !validTypes || busy) return;
+    if (
+      !validSelected.length ||
+      !validTypes ||
+      requestLockRef.current ||
+      restorationStatus === "pending" ||
+      restorationStatus === "error" ||
+      holdRef.current
+    ) {
+      return;
+    }
+
+    requestLockRef.current = true;
     setBusy(true);
     try {
       const result = await bookingApi.createHold(sessionId, validSelected);
@@ -468,6 +493,7 @@ export default function BookingModal({ sessionId, onClose }) {
         }
       }
     } finally {
+      requestLockRef.current = false;
       setBusy(false);
     }
   }
@@ -514,11 +540,12 @@ export default function BookingModal({ sessionId, onClose }) {
   }
   async function pay(event) {
     event.preventDefault();
-    if (!hold || busy) return;
+    if (!hold || requestLockRef.current) return;
     if (isHoldExpired(hold)) {
       await resetExpired();
       return;
     }
+    requestLockRef.current = true;
     setBusy(true);
     setError("");
     setFieldErrors({});
@@ -554,6 +581,7 @@ export default function BookingModal({ sessionId, onClose }) {
         setError(parsed.message);
       }
     } finally {
+      requestLockRef.current = false;
       setBusy(false);
     }
   }
@@ -718,7 +746,14 @@ export default function BookingModal({ sessionId, onClose }) {
                     <button
                       type="button"
                       className={step === "checkout" ? "active" : ""}
-                      disabled={!canCheckout}
+                      disabled={
+                        busy ||
+                        Boolean(hold) ||
+                        sessionStarted ||
+                        restorationStatus === "pending" ||
+                        restorationStatus === "error" ||
+                        !canCheckout
+                      }
                       onClick={() => setStep("checkout")}
                     >
                       CHECKOUT
