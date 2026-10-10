@@ -1,6 +1,13 @@
 import { api } from "./client";
 
 export const moviesApi = {
+  searchMovies: async (query) => {
+    const response = await api.get("/search", {
+      params: { q: query },
+    });
+
+    return response.data;
+  },
   getFeatured: async () => {
     const response = await api.get("/movies/featured");
     return response.data;
