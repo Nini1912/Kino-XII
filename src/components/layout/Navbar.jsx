@@ -12,6 +12,7 @@ import {
 
 import { useAuth } from "../../hooks/useAuth";
 import "./Navbar.css";
+import SearchOverlay from "./SearchOverlay";
 
 export default function Navbar() {
   const navigate = useNavigate();
@@ -26,7 +27,7 @@ export default function Navbar() {
     logout,
   } = useAuth();
 
-  const [search, setSearch] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -55,16 +56,6 @@ export default function Navbar() {
     };
   }, []);
 
-  function handleSearch(event) {
-    event.preventDefault();
-
-    const query = search.trim();
-    if (!query) return;
-
-    navigate(`/search?q=${encodeURIComponent(query)}`);
-    setMobileMenuOpen(false);
-  }
-
   function handleLogout() {
     setDropdownOpen(false);
     setMobileMenuOpen(false);
@@ -80,176 +71,178 @@ export default function Navbar() {
   const displayName = user?.username || "My account";
 
   return (
-    <header className="navbar">
-      <div className="navbar-inner">
-        <Link to="/" className="navbar-logo" onClick={closeMenus}>
-          KINO <span>XII</span>
-        </Link>
+    <>
+      <header className="navbar">
+        <div className="navbar-inner">
+          <Link to="/" className="navbar-logo" onClick={closeMenus}>
+            KINO <span>XII</span>
+          </Link>
 
-        <nav
-          className={`navbar-links ${
-            mobileMenuOpen ? "navbar-links-open" : ""
-          }`}
-        >
-          <NavLink to="/sessions" onClick={closeMenus}>
-            Sessions
-          </NavLink>
-        </nav>
+          <nav
+            className={`navbar-links ${
+              mobileMenuOpen ? "navbar-links-open" : ""
+            }`}
+          >
+            <NavLink to="/sessions" onClick={closeMenus}>
+              Sessions
+            </NavLink>
+          </nav>
 
-        <div className="navbar-right">
-          <form className="navbar-search" onSubmit={handleSearch} role="search">
-            <Search size={16} />
+          <div className="navbar-right">
+            <button
+              type="button"
+              className="navbar-search navbar-search-trigger"
+              onClick={() => setSearchOpen(true)}
+              aria-label="Search films and live events"
+            >
+              <Search size={16} />
+              <span>Search films and live events</span>
+            </button>
 
-            <input
-              type="search"
-              placeholder="Find movies, sessions..."
-              aria-label="Search movies and sessions"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-          </form>
+            {!isInitializing && (
+              <>
+                {isAuthenticated ? (
+                  <div className="navbar-account" ref={dropdownRef}>
+                    <button
+                      type="button"
+                      className="navbar-account-trigger"
+                      aria-label="Open account menu"
+                      aria-haspopup="menu"
+                      aria-expanded={dropdownOpen}
+                      onClick={() => setDropdownOpen((previous) => !previous)}
+                    >
+                      {user?.avatar ? (
+                        <img
+                          src={user.avatar}
+                          alt=""
+                          className="navbar-account-avatar"
+                        />
+                      ) : (
+                        <span className="navbar-account-avatar navbar-account-fallback">
+                          {displayName.charAt(0).toUpperCase()}
+                        </span>
+                      )}
 
-          {!isInitializing && (
-            <>
-              {isAuthenticated ? (
-                <div className="navbar-account" ref={dropdownRef}>
-                  <button
-                    type="button"
-                    className="navbar-account-trigger"
-                    aria-label="Open account menu"
-                    aria-haspopup="menu"
-                    aria-expanded={dropdownOpen}
-                    onClick={() => setDropdownOpen((previous) => !previous)}
-                  >
-                    {user?.avatar ? (
-                      <img
-                        src={user.avatar}
-                        alt=""
-                        className="navbar-account-avatar"
+                      <span className="navbar-account-name">{displayName}</span>
+
+                      <ChevronDown
+                        size={14}
+                        className={dropdownOpen ? "navbar-chevron-open" : ""}
                       />
-                    ) : (
-                      <span className="navbar-account-avatar navbar-account-fallback">
-                        {displayName.charAt(0).toUpperCase()}
-                      </span>
-                    )}
+                    </button>
 
-                    <span className="navbar-account-name">{displayName}</span>
+                    {dropdownOpen && (
+                      <div className="navbar-account-dropdown" role="menu">
+                        <div className="navbar-dropdown-user">
+                          {user?.avatar ? (
+                            <img
+                              src={user.avatar}
+                              alt=""
+                              className="navbar-dropdown-avatar"
+                            />
+                          ) : (
+                            <span className="navbar-dropdown-avatar navbar-account-fallback">
+                              {displayName.charAt(0).toUpperCase()}
+                            </span>
+                          )}
 
-                    <ChevronDown
-                      size={14}
-                      className={dropdownOpen ? "navbar-chevron-open" : ""}
-                    />
-                  </button>
+                          <div>
+                            <strong>{displayName}</strong>
+                            <small>{user?.email}</small>
+                          </div>
+                        </div>
 
-                  {dropdownOpen && (
-                    <div className="navbar-account-dropdown" role="menu">
-                      <div className="navbar-dropdown-user">
-                        {user?.avatar ? (
-                          <img
-                            src={user.avatar}
-                            alt=""
-                            className="navbar-dropdown-avatar"
-                          />
+                        {isProfileComplete ? (
+                          <div className="navbar-profile-status navbar-status-complete">
+                            <span className="navbar-status-dot" />
+                            Profile completed
+                          </div>
                         ) : (
-                          <span className="navbar-dropdown-avatar navbar-account-fallback">
-                            {displayName.charAt(0).toUpperCase()}
-                          </span>
+                          <Link
+                            to="/profile"
+                            className="navbar-profile-status navbar-status-incomplete"
+                            onClick={closeMenus}
+                            role="menuitem"
+                          >
+                            <strong>Complete your profile</strong>
+                            <small>
+                              Add your details to finish setting up your
+                              account.
+                            </small>
+                          </Link>
                         )}
 
-                        <div>
-                          <strong>{displayName}</strong>
-                          <small>{user?.email}</small>
-                        </div>
-                      </div>
+                        <div className="navbar-dropdown-divider" />
 
-                      {isProfileComplete ? (
-                        <div className="navbar-profile-status navbar-status-complete">
-                          <span className="navbar-status-dot" />
-                          Profile completed
-                        </div>
-                      ) : (
                         <Link
                           to="/profile"
-                          className="navbar-profile-status navbar-status-incomplete"
+                          className="navbar-dropdown-item"
                           onClick={closeMenus}
                           role="menuitem"
                         >
-                          <strong>Complete your profile</strong>
-                          <small>
-                            Add your details to finish setting up your account.
-                          </small>
+                          <UserRound size={16} />
+                          My Profile
                         </Link>
-                      )}
 
-                      <div className="navbar-dropdown-divider" />
+                        <Link
+                          to="/profile?tab=tickets"
+                          className="navbar-dropdown-item"
+                          onClick={closeMenus}
+                          role="menuitem"
+                        >
+                          <Ticket size={16} />
+                          My Tickets
+                        </Link>
 
-                      <Link
-                        to="/profile"
-                        className="navbar-dropdown-item"
-                        onClick={closeMenus}
-                        role="menuitem"
-                      >
-                        <UserRound size={16} />
-                        My Profile
-                      </Link>
+                        <div className="navbar-dropdown-divider" />
 
-                      <Link
-                        to="/profile?tab=tickets"
-                        className="navbar-dropdown-item"
-                        onClick={closeMenus}
-                        role="menuitem"
-                      >
-                        <Ticket size={16} />
-                        My Tickets
-                      </Link>
+                        <button
+                          type="button"
+                          className="navbar-dropdown-item navbar-dropdown-logout"
+                          onClick={handleLogout}
+                          role="menuitem"
+                        >
+                          <LogOut size={16} />
+                          Log out
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="navbar-auth-actions">
+                    <button
+                      type="button"
+                      className="navbar-login-button"
+                      onClick={openLogin}
+                    >
+                      Log In
+                    </button>
 
-                      <div className="navbar-dropdown-divider" />
+                    <button
+                      type="button"
+                      className="navbar-signup-button"
+                      onClick={openRegister}
+                    >
+                      Sign Up
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
 
-                      <button
-                        type="button"
-                        className="navbar-dropdown-item navbar-dropdown-logout"
-                        onClick={handleLogout}
-                        role="menuitem"
-                      >
-                        <LogOut size={16} />
-                        Log out
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="navbar-auth-actions">
-                  <button
-                    type="button"
-                    className="navbar-login-button"
-                    onClick={openLogin}
-                  >
-                    Log In
-                  </button>
-
-                  <button
-                    type="button"
-                    className="navbar-signup-button"
-                    onClick={openRegister}
-                  >
-                    Sign Up
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-
-          <button
-            type="button"
-            className="navbar-mobile-toggle"
-            aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
-            aria-expanded={mobileMenuOpen}
-            onClick={() => setMobileMenuOpen((previous) => !previous)}
-          >
-            {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
-          </button>
+            <button
+              type="button"
+              className="navbar-mobile-toggle"
+              aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={mobileMenuOpen}
+              onClick={() => setMobileMenuOpen((previous) => !previous)}
+            >
+              {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+            </button>
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+      <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
+    </>
   );
 }

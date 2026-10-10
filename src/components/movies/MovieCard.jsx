@@ -7,7 +7,7 @@ export default function MovieCard({ movie }) {
 
   const duration = movie.duration_minutes ?? movie.duration;
 
- const price = movie.fromPrice;
+  const price = movie.fromPrice;
 
   const genre = Array.isArray(movie.genres)
     ? movie.genres
@@ -51,7 +51,7 @@ export default function MovieCard({ movie }) {
             {price != null ? `From ₾ ${price}` : "Price unavailable"}
           </span>
 
-          <Link to={`/movies/${id}`} className="btn btn-primary">
+          <Link to={`/movies/${id}#movie-sessions`} className="btn btn-primary">
             Buy Ticket
           </Link>
         </div>

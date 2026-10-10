@@ -89,7 +89,10 @@ export default function HeroCarousel({ movies = [] }) {
         {description && <p className="hero-description">{description}</p>}
 
         <div className="hero-buttons">
-          <Link to={`/movies/${movieId}`} className="btn btn-primary">
+          <Link
+            to={`/movies/${movieId}#movie-sessions`}
+            className="btn btn-primary"
+          >
             <Ticket size={17} fill="currentColor" />
             Buy tickets
           </Link>

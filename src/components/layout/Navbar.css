@@ -601,3 +601,7 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+.navbar-search-trigger { justify-content:flex-start; text-align:left; font-size:12px; cursor:pointer; }
+.navbar-search-trigger span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#c1cad3; }
+@media(max-width:600px) { .navbar-search-trigger { width:36px; flex-shrink:0; } .navbar-search-trigger span { display:none; } }

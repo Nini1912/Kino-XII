@@ -1,0 +1,6 @@
+.kino-footer { background: #080d1d; padding: 28px 2% 35px; }
+.kino-footer-inner { max-width: 1680px; margin: 0 auto; padding: 21px 0 0; border-top: 1px solid #24283a; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.kino-footer-brand { font-size: 14px; font-weight: 900; color: #fff; letter-spacing: -.3px; }
+.kino-footer-brand span { color: #ff3925; }
+.kino-footer-inner p { margin: 0; color: #888b9a; font-size: 11px; }
+@media(max-width:520px) { .kino-footer { padding: 20px 16px 30px; } .kino-footer-inner { flex-wrap: wrap; } }
