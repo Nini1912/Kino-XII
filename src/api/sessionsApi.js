@@ -6,13 +6,14 @@ export const sessionsApi = {
     return data.data ?? data;
   },
 
-  getSessions: async (params) => {
+  getSessions: async (params = {}) => {
     const query = new URLSearchParams();
 
     if (params.date) query.set("date", params.date);
     if (params.search) query.set("search", params.search);
     if (params.sort) query.set("sort", params.sort);
-    query.set("page", String(params.page || 1));
+
+    query.set("page", String(params.page ?? 1));
 
     const arrayFilters = {
       venues: params.venues,
@@ -22,12 +23,17 @@ export const sessionsApi = {
     };
 
     Object.entries(arrayFilters).forEach(([key, values]) => {
-      (values || []).forEach((value) => {
+      if (!Array.isArray(values)) return;
+
+      values.forEach((value) => {
         query.append(`${key}[]`, value);
       });
     });
 
-    const { data } = await api.get(`/sessions?${query.toString()}`);
+    const { data } = await api.get("/sessions", {
+      params: query,
+    });
+
     return data;
   },
 
