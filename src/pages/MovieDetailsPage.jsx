@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import { Clock3 } from "lucide-react";
 import { moviesApi } from "../api/moviesApi";
 import { useAuth } from "../hooks/useAuth";
 import { useRecentlyViewed } from "../hooks/useRecentlyViewed";
 import "../styles/movieDetails.css";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 const unwrap = (response) => response?.data ?? response;
 const prettyDate = (value) =>
@@ -28,7 +28,8 @@ export default function MovieDetailsPage() {
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, requireLogin } = useAuth();
+  const queryClient = useQueryClient();
   const { addRecentlyViewed } = useRecentlyViewed();
   const [selectedDate, setSelectedDate] = useState("");
   const movieQuery = useQuery({
@@ -46,6 +47,41 @@ export default function MovieDetailsPage() {
     queryFn: () => moviesApi.getMovieSessions(id, date),
     enabled: !!id && !!date && !movie?.isComingSoon,
   });
+
+  const notifyMutation = useMutation({
+    mutationFn: (movieId) => moviesApi.notifyMovie(movieId),
+
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["movie", id],
+          exact: true,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["coming-soon"],
+        }),
+      ]);
+    },
+  });
+
+  function handleNotify() {
+    if (notifyMutation.isPending || movie?.isNotified) {
+      return;
+    }
+
+    const movieId = movie?.id ?? id;
+
+    if (!movieId) return;
+
+    if (!isAuthenticated) {
+      requireLogin(() => {
+        return notifyMutation.mutateAsync(movieId);
+      });
+      return;
+    }
+
+    notifyMutation.mutate(movieId);
+  }
   const venueGroups = useMemo(() => {
     const result = unwrap(sessionsQuery.data);
     return Array.isArray(result) ? result : [];
@@ -162,11 +198,39 @@ export default function MovieDetailsPage() {
             </p>
           )}
           {isUpcoming ? (
-            <p className="md-muted">
-              {movie.isComingSoon
-                ? "Sessions will be announced soon."
-                : "No upcoming sessions are available."}
-            </p>
+            <div className="md-coming-soon">
+              <p className="md-muted">
+                {movie.isComingSoon
+                  ? "Sessions will be announced soon."
+                  : "No upcoming sessions are available."}
+              </p>
+
+              {movie.isComingSoon && (
+                <>
+                  <button
+                    type="button"
+                    className="md-notify-button"
+                    onClick={handleNotify}
+                    disabled={
+                      notifyMutation.isPending || movie.isNotified === true
+                    }
+                  >
+                    {notifyMutation.isPending
+                      ? "Saving..."
+                      : movie.isNotified
+                        ? "Notification Enabled ✓"
+                        : "Notify Me"}
+                  </button>
+
+                  {notifyMutation.isError && (
+                    <p className="md-warning" role="alert">
+                      {notifyMutation.error?.response?.data?.message ??
+                        "Unable to enable notifications. Please try again."}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
           ) : sessionsQuery.isPending ? (
             <p className="md-muted">Loading sessions...</p>
           ) : sessionsQuery.isError ? (

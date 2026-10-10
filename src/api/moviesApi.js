@@ -1,6 +1,14 @@
 import { api } from "./client";
 
 export const moviesApi = {
+  notifyMovie: async (movieId) => {
+    const response = await api.post(
+      `/movies/${encodeURIComponent(movieId)}/notify`,
+    );
+
+    return response.data;
+  },
+
   searchMovies: async (query) => {
     const response = await api.get("/search", {
       params: { q: query },
