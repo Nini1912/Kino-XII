@@ -19,7 +19,7 @@ export default function HeroCarousel({ movies = [] }) {
 
   const movie = movies[active % movies.length];
 
-  const movieId = movie.id ?? movie.slug;
+  const movieId = movie.slug ?? movie.id;
 
   const backdrop =
     movie.backdrop_url ??
@@ -97,7 +97,7 @@ export default function HeroCarousel({ movies = [] }) {
             Buy tickets
           </Link>
 
-          <Link to={`/movies/${movieId}`} className="btn btn-outline">
+          <Link to="/sessions" className="btn btn-outline">
             All sessions
           </Link>
         </div>

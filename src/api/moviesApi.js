@@ -21,9 +21,10 @@ export const moviesApi = {
     return response.data;
   },
 
-  getMovieSessions: async (id) => {
+  getMovieSessions: async (id, date) => {
     const response = await api.get(
       `/movies/${encodeURIComponent(id)}/sessions`,
+      { params: date ? { date } : {} },
     );
     return response.data;
   },

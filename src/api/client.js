@@ -2,6 +2,7 @@ import axios from "axios";
 
 export const api = axios.create({
   baseURL: "https://api.kinoxii.redberryinternship.ge/api",
+  timeout: 15000,
   headers: {
     Accept: "application/json",
   },

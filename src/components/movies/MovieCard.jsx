@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 
 export default function MovieCard({ movie }) {
-  const id = movie.id ?? movie.slug;
+  const id = movie.slug ?? movie.id;
 
   const poster = movie.poster_url ?? movie.posterUrl ?? movie.poster;
 

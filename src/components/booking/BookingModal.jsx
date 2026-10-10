@@ -169,10 +169,20 @@ export default function BookingModal({ sessionId, onClose }) {
     0,
   );
   const subtotal = hold?.subtotal ?? estimated;
-  const isLoading =
-    sessionQuery.isPending || seatsQuery.isPending || optionsQuery.isPending;
   const hasError =
     sessionQuery.isError || seatsQuery.isError || optionsQuery.isError;
+  const isLoading =
+    !hasError &&
+    (sessionQuery.isPending || seatsQuery.isPending || optionsQuery.isPending);
+  const loadingError = [sessionQuery, seatsQuery, optionsQuery]
+    .filter((query) => query.isError)
+    .map(
+      (query) =>
+        query.error?.response?.data?.message ||
+        query.error?.message ||
+        "Request failed",
+    )
+    .join(" · ");
   const sessionStarted = Boolean(
     session?.startsAt && Date.parse(session.startsAt) <= Date.now(),
   );
@@ -564,7 +574,7 @@ export default function BookingModal({ sessionId, onClose }) {
               <div className="kb-state">Loading booking details...</div>
             ) : hasError ? (
               <div className="kb-state">
-                Unable to load booking details.{" "}
+                Unable to load booking details: {loadingError}.{" "}
                 <button
                   onClick={() => {
                     sessionQuery.refetch();

@@ -1,283 +1,273 @@
-import { useEffect } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, CalendarDays, Clock3, MapPin, Ticket } from "lucide-react";
-
+import { Clock3 } from "lucide-react";
 import { moviesApi } from "../api/moviesApi";
 import { useAuth } from "../hooks/useAuth";
 import { useRecentlyViewed } from "../hooks/useRecentlyViewed";
-
 import "../styles/movieDetails.css";
 
-function unwrapMovie(response) {
-  const data = response?.data ?? response;
-  return data?.movie ?? data;
-}
-
-function unwrapSessions(response) {
-  const data = response?.data ?? response;
-
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.sessions)) return data.sessions;
-  if (Array.isArray(data?.data)) return data.data;
-
-  return [];
-}
-
-function getGenreNames(genres) {
-  if (Array.isArray(genres)) {
-    return genres
-      .map((genre) =>
-        typeof genre === "string" ? genre : (genre?.name ?? genre?.label),
-      )
-      .filter(Boolean)
-      .join(", ");
-  }
-
-  return typeof genres === "string" ? genres : "";
-}
-
-function getAgeRating(movie) {
-  const rating = movie.age_rating ?? movie.ageRating;
-
-  return typeof rating === "object"
-    ? (rating?.label ?? rating?.name ?? rating?.code)
-    : rating;
-}
-
-function formatDate(value) {
-  if (!value) return "Date unavailable";
-
-  const date = new Date(value);
-
-  return Number.isNaN(date.getTime())
-    ? String(value)
-    : new Intl.DateTimeFormat("en-GB", {
+const unwrap = (response) => response?.data ?? response;
+const prettyDate = (value) =>
+  new Intl.DateTimeFormat("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${value}T12:00:00Z`));
+const longDate = (value) =>
+  value
+    ? new Intl.DateTimeFormat("en-GB", {
         day: "numeric",
-        month: "short",
+        month: "long",
         year: "numeric",
-      }).format(date);
-}
-
-function formatTime(value) {
-  if (!value) return "Time unavailable";
-
-  const date = new Date(value);
-
-  return Number.isNaN(date.getTime())
-    ? String(value)
-    : new Intl.DateTimeFormat("en-GB", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }).format(date);
-}
-
-function SessionCard({ session }) {
-  const start =
-    session.startsAt ??
-    session.startTime ??
-    session.start_time ??
-    session.datetime ??
-    session.dateTime;
-
-  const venue =
-    session.venue?.name ??
-    session.venueName ??
-    session.cinema?.name ??
-    "Venue to be confirmed";
-
-  const hall =
-    session.hall?.name ?? session.hallName ?? session.auditorium?.name;
-
-  const format =
-    session.format?.name ??
-    session.format?.label ??
-    (typeof session.format === "string" ? session.format : null);
-
-  const price = session.fromPrice ?? session.priceFrom ?? session.price;
-
-  return (
-    <article className="details-session-card">
-      <div className="details-session-main">
-        <div className="details-session-date">
-          <CalendarDays size={17} />
-          <span>{formatDate(start)}</span>
-        </div>
-
-        <strong className="details-session-time">{formatTime(start)}</strong>
-
-        <div className="details-session-location">
-          <MapPin size={15} />
-          <span>
-            {venue}
-            {hall ? ` · ${hall}` : ""}
-          </span>
-        </div>
-
-        {format && <span className="details-session-format">{format}</span>}
-      </div>
-
-      <div className="details-session-action">
-        {price != null && <span>From ₾ {price}</span>}
-
-        <Link to={`/sessions/${session.id}`} className="details-book-button">
-          Select seats
-        </Link>
-      </div>
-    </article>
-  );
-}
+        timeZone: "UTC",
+      }).format(new Date(`${value}T12:00:00Z`))
+    : "—";
 
 export default function MovieDetailsPage() {
   const { id } = useParams();
-
-  const { isAuthenticated } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuth();
   const { addRecentlyViewed } = useRecentlyViewed();
-
+  const [selectedDate, setSelectedDate] = useState("");
   const movieQuery = useQuery({
     queryKey: ["movie", id],
     queryFn: () => moviesApi.getMovie(id),
-    enabled: Boolean(id),
+    enabled: !!id,
   });
-
+  const movie = unwrap(movieQuery.data);
+  const availableDates = movie?.availableDates ?? [];
+  const date = availableDates.includes(selectedDate)
+    ? selectedDate
+    : (availableDates[0] ?? "");
   const sessionsQuery = useQuery({
-    queryKey: ["movie", id, "sessions"],
-    queryFn: () => moviesApi.getMovieSessions(id),
-    enabled: Boolean(id),
+    queryKey: ["movie", id, "sessions", date],
+    queryFn: () => moviesApi.getMovieSessions(id, date),
+    enabled: !!id && !!date && !movie?.isComingSoon,
   });
-
-  const movie = unwrapMovie(movieQuery.data);
+  const venueGroups = useMemo(() => {
+    const result = unwrap(sessionsQuery.data);
+    return Array.isArray(result) ? result : [];
+  }, [sessionsQuery.data]);
 
   useEffect(() => {
-    if (!isAuthenticated || !movie?.id) return;
+    if (isAuthenticated && movie?.id) addRecentlyViewed(movie);
+  }, [isAuthenticated, movie?.id, addRecentlyViewed]);
+  useEffect(() => {
+    if (location.hash !== "#movie-sessions" || movieQuery.isPending) return;
+    const frame = requestAnimationFrame(() =>
+      document
+        .getElementById("movie-sessions")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [location.hash, movieQuery.isPending]);
 
-    addRecentlyViewed(movie);
-  }, [movie, isAuthenticated, addRecentlyViewed]);
-
-  if (movieQuery.isPending) {
+  if (movieQuery.isPending)
+    return <main className="md-status-page">Loading movie...</main>;
+  if (movieQuery.isError || !movie)
     return (
-      <main className="movie-details-page">
-        <div className="movie-details-container">
-          <p>Loading movie...</p>
-        </div>
+      <main className="md-status-page">
+        <h1>Movie unavailable</h1>
+        <p>
+          {movieQuery.error?.response?.data?.message ??
+            "We couldn't load this movie."}
+        </p>
+        <Link to="/">Back to movies</Link>
       </main>
     );
-  }
 
-  if (movieQuery.isError || !movie) {
-    return (
-      <main className="movie-details-page">
-        <div className="movie-details-container">
-          <h1>Movie unavailable</h1>
-          <p>We couldn't load this movie.</p>
-          <Link to="/" className="details-back-link">
-            <ArrowLeft size={17} />
-            Back to movies
-          </Link>
-        </div>
-      </main>
-    );
-  }
-
-  const poster = movie.poster_url ?? movie.posterUrl ?? movie.poster;
-
+  const poster = movie.posterUrl ?? movie.poster_url ?? movie.poster;
   const backdrop =
-    movie.backdrop_url ?? movie.backdropUrl ?? movie.backdrop ?? poster;
-
-  const duration = movie.duration_minutes ?? movie.duration;
-
-  const description =
-    movie.synopsis ?? movie.description ?? "Description unavailable.";
-
-  const genre = getGenreNames(movie.genres ?? movie.genre);
-
-  const ageRating = getAgeRating(movie);
-  const sessions = unwrapSessions(sessionsQuery.data);
+    movie.backdropUrl ?? movie.backdrop_url ?? movie.backdrop ?? poster;
+  const age = movie.ageRating ?? movie.age_rating;
+  const ageCode = typeof age === "object" ? age?.code : age;
+  const ageRestricted =
+    isAuthenticated &&
+    user?.age != null &&
+    age?.minAge != null &&
+    Number(user.age) < Number(age.minAge);
+  const genres = (movie.genres ?? [])
+    .map((item) => (typeof item === "string" ? item : item.name))
+    .filter(Boolean)
+    .join(", ");
+  const formats = (movie.formats ?? [])
+    .map((item) => (typeof item === "string" ? item : item.name))
+    .filter(Boolean)
+    .join(", ");
+  const isUpcoming = movie.isComingSoon || !availableDates.length;
 
   return (
-    <main className="movie-details-page">
-      <div
-        className="movie-details-backdrop"
+    <main className="md-page">
+      <section
+        className="md-hero"
         style={{
-          backgroundImage: backdrop ? `url("${backdrop}")` : "none",
+          backgroundImage: backdrop
+            ? `linear-gradient(90deg,rgba(6,10,23,.78),rgba(6,10,23,.30)),url("${backdrop}")`
+            : undefined,
         }}
-      />
-
-      <div className="movie-details-container">
-        <Link to="/" className="details-back-link">
-          <ArrowLeft size={17} />
-          Back to movies
-        </Link>
-
-        <section className="movie-details-hero">
-          <div className="movie-details-poster">
-            {poster ? (
-              <img src={poster} alt={movie.title} />
-            ) : (
-              <div className="details-poster-empty">No poster available</div>
-            )}
+      >
+        <div className="md-container md-hero-inner">
+          <div className="md-poster">
+            {poster && <img src={poster} alt={movie.title} />}
           </div>
-
-          <div className="movie-details-content">
-            <span className="details-eyebrow">KINO XII</span>
-
+          <div className="md-hero-copy">
+            <span className="md-eyebrow">
+              {movie.isComingSoon ? "COMING SOON" : "NOW PLAYING"}
+            </span>
             <h1>{movie.title}</h1>
-
-            <div className="details-meta">
-              {ageRating && <span className="details-age">{ageRating}</span>}
-
-              {duration && (
-                <span>
-                  <Clock3 size={16} />
-                  {duration} min
+            <p>{movie.synopsis ?? movie.description}</p>
+            <div className="md-chips">
+              {ageCode && (
+                <span className="md-age" title={age?.description ?? ""}>
+                  {ageCode}
                 </span>
               )}
-
-              {genre && <span>{genre}</span>}
+              {movie.runtimeMinutes && (
+                <span>
+                  <Clock3 size={14} /> {movie.runtimeMinutes} Min
+                </span>
+              )}
+              {(movie.formats ?? []).map((f) => (
+                <span key={f.id ?? f.slug ?? f}>
+                  {typeof f === "string" ? f : f.name}
+                </span>
+              ))}
             </div>
-
-            <p className="details-description">{description}</p>
-
-            {movie.fromPrice != null && (
-              <p className="details-price">
-                From <strong>₾ {movie.fromPrice}</strong>
-              </p>
-            )}
-
-            <a href="#movie-sessions" className="details-primary-button">
-              <Ticket size={18} />
-              Buy tickets
-            </a>
           </div>
-        </section>
-
-        <section id="movie-sessions" className="movie-sessions-section">
-          <div className="movie-sessions-heading">
-            <h2>Available sessions</h2>
-            <p>Choose a screening to continue booking.</p>
-          </div>
-
-          {sessionsQuery.isPending ? (
-            <p className="details-status">Loading sessions...</p>
-          ) : sessionsQuery.isError ? (
-            <div className="details-status">
-              <p>Unable to load sessions.</p>
-              <button type="button" onClick={() => sessionsQuery.refetch()}>
-                Try again
-              </button>
-            </div>
-          ) : sessions.length === 0 ? (
-            <p className="details-status">
-              No sessions are currently available.
-            </p>
-          ) : (
-            <div className="details-sessions-list">
-              {sessions.map((session) => (
-                <SessionCard key={session.id} session={session} />
+        </div>
+      </section>
+      <div className="md-container md-main">
+        <section id="movie-sessions" className="md-sessions">
+          <h2>Sessions</h2>
+          {availableDates.length > 0 && (
+            <div className="md-dates" aria-label="Choose session date">
+              {availableDates.slice(0, 7).map((day) => (
+                <button
+                  key={day}
+                  type="button"
+                  className={date === day ? "selected" : ""}
+                  onClick={() => setSelectedDate(day)}
+                >
+                  <span>{prettyDate(day).split(" ")[0]}</span>
+                  <strong>{day.slice(-2)}</strong>
+                </button>
               ))}
             </div>
           )}
+          {ageRestricted && (
+            <p className="md-warning">
+              You must be at least {age.minAge} to book this film.
+            </p>
+          )}
+          {isUpcoming ? (
+            <p className="md-muted">
+              {movie.isComingSoon
+                ? "Sessions will be announced soon."
+                : "No upcoming sessions are available."}
+            </p>
+          ) : sessionsQuery.isPending ? (
+            <p className="md-muted">Loading sessions...</p>
+          ) : sessionsQuery.isError ? (
+            <div className="md-muted">
+              Could not load sessions:{" "}
+              {sessionsQuery.error?.response?.data?.message ??
+                sessionsQuery.error?.message}
+              <button type="button" onClick={() => sessionsQuery.refetch()}>
+                Retry
+              </button>
+            </div>
+          ) : !venueGroups.length ? (
+            <p className="md-muted">No sessions for this date.</p>
+          ) : (
+            venueGroups.map((group, gi) => (
+              <div className="md-venue" key={group.venue?.id ?? gi}>
+                <h3>{group.venue?.name ?? "Cinema"}</h3>
+                <div className="md-halls">
+                  {Object.entries(
+                    (group.sessions ?? []).reduce((acc, session) => {
+                      const key = session.hall?.name ?? "Hall";
+                      (acc[key] ??= []).push(session);
+                      return acc;
+                    }, {}),
+                  ).map(([hall, sessions]) => (
+                    <div className="md-hall" key={hall}>
+                      <h4>Hall {hall}</h4>
+                      <div className="md-showtimes">
+                        {sessions.map((session) => {
+                          const disabled =
+                            session.isSoldOut ||
+                            session.seatsLeft <= 0 ||
+                            ageRestricted ||
+                            (session.startsAt &&
+                              Date.parse(session.startsAt) <= Date.now());
+                          return (
+                            <button
+                              key={session.id}
+                              type="button"
+                              disabled={disabled}
+                              className="md-showtime"
+                              onClick={() =>
+                                navigate(`/sessions/${session.id}`)
+                              }
+                              title={
+                                disabled
+                                  ? "This session cannot be booked"
+                                  : `Book ${session.time}`
+                              }
+                            >
+                              <span className="md-showtime-top">
+                                <strong>{session.time ?? "—"}</strong>
+                                <b>₾ {session.price}</b>
+                              </span>
+                              <span className="md-showtime-bottom">
+                                <span>{session.language?.code ?? "—"}</span>
+                                <span>
+                                  {session.format?.name ?? "Standard"}
+                                </span>
+                                <span>
+                                  {session.isSoldOut
+                                    ? "Sold out"
+                                    : `${session.seatsLeft} left`}
+                                </span>
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
         </section>
+        <aside className="md-details">
+          <h2>Details</h2>
+          <dl>
+            <dt>DIRECTOR</dt>
+            <dd>{movie.director ?? "—"}</dd>
+            <dt>MAIN CAST</dt>
+            <dd>{movie.cast ?? "—"}</dd>
+            <dt>DURATION</dt>
+            <dd>
+              {movie.runtimeMinutes ? `${movie.runtimeMinutes} minutes` : "—"}
+            </dd>
+            <dt>RELEASE DATE</dt>
+            <dd>{longDate(movie.releaseDate)}</dd>
+            <dt>FORMATS</dt>
+            <dd>{formats || "—"}</dd>
+            <dt>FROM</dt>
+            <dd>{movie.fromPrice != null ? `₾${movie.fromPrice}` : "—"}</dd>
+          </dl>
+          {age?.description && (
+            <div className="md-rating-note">
+              <strong>RATING NOTE</strong>
+              <p>{age.description}</p>
+            </div>
+          )}
+        </aside>
       </div>
     </main>
   );
