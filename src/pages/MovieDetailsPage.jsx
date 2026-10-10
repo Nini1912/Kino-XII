@@ -7,6 +7,27 @@ import { useRecentlyViewed } from "../hooks/useRecentlyViewed";
 import "../styles/movieDetails.css";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+function getNextSevenDays() {
+  const today = new Date();
+  const days = [];
+
+  for (let offset = 0; offset < 7; offset++) {
+    const day = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate() + offset,
+    );
+
+    const year = day.getFullYear();
+    const month = String(day.getMonth() + 1).padStart(2, "0");
+    const date = String(day.getDate()).padStart(2, "0");
+
+    days.push(`${year}-${month}-${date}`);
+  }
+
+  return days;
+}
+
 const unwrap = (response) => response?.data ?? response;
 const prettyDate = (value) =>
   new Intl.DateTimeFormat("en-GB", {
@@ -25,6 +46,7 @@ const longDate = (value) =>
     : "—";
 
 export default function MovieDetailsPage() {
+  const calendarDays = useMemo(() => getNextSevenDays(), []);
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -41,7 +63,7 @@ export default function MovieDetailsPage() {
   const availableDates = movie?.availableDates ?? [];
   const date = availableDates.includes(selectedDate)
     ? selectedDate
-    : (availableDates[0] ?? "");
+    : (calendarDays.find((day) => availableDates.includes(day)) ?? "");
   const sessionsQuery = useQuery({
     queryKey: ["movie", id, "sessions", date],
     queryFn: () => moviesApi.getMovieSessions(id, date),
@@ -179,17 +201,28 @@ export default function MovieDetailsPage() {
           <h2>Sessions</h2>
           {availableDates.length > 0 && (
             <div className="md-dates" aria-label="Choose session date">
-              {availableDates.slice(0, 7).map((day) => (
-                <button
-                  key={day}
-                  type="button"
-                  className={date === day ? "selected" : ""}
-                  onClick={() => setSelectedDate(day)}
-                >
-                  <span>{prettyDate(day).split(" ")[0]}</span>
-                  <strong>{day.slice(-2)}</strong>
-                </button>
-              ))}
+              {calendarDays.map((day) => {
+                const available = availableDates.includes(day);
+
+                return (
+                  <button
+                    key={day}
+                    type="button"
+                    className={date === day ? "selected" : ""}
+                    disabled={!available}
+                    onClick={() => setSelectedDate(day)}
+                    aria-pressed={date === day}
+                    title={
+                      available
+                        ? `Show sessions for ${day}`
+                        : "No sessions available"
+                    }
+                  >
+                    <span>{prettyDate(day).split(" ")[0]}</span>
+                    <strong>{day.slice(-2)}</strong>
+                  </button>
+                );
+              })}
             </div>
           )}
           {ageRestricted && (
