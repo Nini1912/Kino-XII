@@ -120,7 +120,7 @@ function Field({ label, name, value, onChange, error, ...props }) {
 export default function BookingModal({ sessionId, onClose }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user, isAuthenticated, openLogin } = useAuth();
+  const { user, isAuthenticated, openLogin, requireLogin } = useAuth();
   const [selected, setSelected] = useState([]);
   const [step, setStep] = useState("seats");
   const [hold, setHold] = useState(null);
@@ -341,14 +341,9 @@ export default function BookingModal({ sessionId, onClose }) {
     });
   }
 
-  async function proceed() {
+  async function createBookingHold(currentUser) {
     setError("");
-    if (!isAuthenticated) {
-      openLogin();
-      setError("Log in to continue booking.");
-      return;
-    }
-    if (!user?.profileComplete) {
+    if (!currentUser?.profileComplete) {
       setError("Complete your profile before booking.");
       return;
     }
@@ -356,7 +351,7 @@ export default function BookingModal({ sessionId, onClose }) {
       setError("That session has already started. Choose another showtime.");
       return;
     }
-    if (!selected.length || !validTypes) return;
+    if (!selected.length || !validTypes || busy) return;
     setBusy(true);
     try {
       const result = await bookingApi.createHold(sessionId, selected);
@@ -368,11 +363,22 @@ export default function BookingModal({ sessionId, onClose }) {
       if (err.response?.status === 409) await handleConflict(err);
       else {
         setError(getError(err));
-        if (err.response?.status === 401) openLogin();
+        if (err.response?.status === 401) {
+          requireLogin((loggedInUser) => createBookingHold(loggedInUser));
+        }
       }
     } finally {
       setBusy(false);
     }
+  }
+
+  async function proceed() {
+    if (!isAuthenticated) {
+      requireLogin((loggedInUser) => createBookingHold(loggedInUser));
+      setError("Log in to continue booking.");
+      return;
+    }
+    await createBookingHold(user);
   }
 
   async function updateHold() {

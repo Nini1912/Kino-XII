@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { authApi } from "../api/authApi";
 import { AuthContext } from "./authContext";
@@ -6,6 +6,14 @@ import { AuthContext } from "./authContext";
 const TOKEN_KEY = "kino_token";
 
 export function AuthProvider({ children }) {
+  const pendingActionRef = useRef(null);
+
+  const requireLogin = useCallback((action) => {
+    pendingActionRef.current = action;
+    setIsRegisterOpen(false);
+    setIsLoginOpen(true);
+  }, []);
+
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY));
 
   const [user, setUser] = useState(null);
@@ -17,23 +25,24 @@ export function AuthProvider({ children }) {
     Boolean(localStorage.getItem(TOKEN_KEY)),
   );
 
-  const openLogin = useCallback(() => {
+  const openLogin = () => {
     setIsRegisterOpen(false);
     setIsLoginOpen(true);
-  }, []);
+  };
 
-  const closeLogin = useCallback(() => {
+  const closeLogin = () => {
+    pendingActionRef.current = null;
     setIsLoginOpen(false);
-  }, []);
+  };
 
-  const openRegister = useCallback(() => {
+  const openRegister = () => {
     setIsLoginOpen(false);
     setIsRegisterOpen(true);
-  }, []);
+  };
 
-  const closeRegister = useCallback(() => {
+  const closeRegister = () => {
     setIsRegisterOpen(false);
-  }, []);
+  };
 
   const clearSession = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
@@ -94,7 +103,8 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     function handleAuthRequired() {
-      openLogin();
+      setIsRegisterOpen(false);
+      setIsLoginOpen(true);
     }
 
     window.addEventListener("auth:required", handleAuthRequired);
@@ -102,7 +112,7 @@ export function AuthProvider({ children }) {
     return () => {
       window.removeEventListener("auth:required", handleAuthRequired);
     };
-  }, [openLogin]);
+  }, []);
 
   const login = async (credentials) => {
     const response = await authApi.login(credentials);
@@ -119,8 +129,19 @@ export function AuthProvider({ children }) {
     setToken(accessToken);
     setUser(currentUser);
 
-    closeLogin();
+    setIsLoginOpen(false);
     closeRegister();
+
+    const pendingAction = pendingActionRef.current;
+    pendingActionRef.current = null;
+    if (pendingAction) {
+      // Let React apply the new authentication state before resuming.
+      queueMicrotask(() => {
+        Promise.resolve()
+          .then(() => pendingAction(currentUser))
+          .catch(console.error);
+      });
+    }
 
     return currentUser;
   };
@@ -163,6 +184,7 @@ export function AuthProvider({ children }) {
 
         isLoginOpen,
         openLogin,
+        requireLogin,
         closeLogin,
 
         isRegisterOpen,
