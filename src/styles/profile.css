@@ -570,3 +570,75 @@
     transition: none;
   }
 }
+
+
+
+.ticket-refund-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.75);
+}
+
+.ticket-refund-dialog {
+  width: min(100%, 430px);
+  padding: 30px;
+  border: 1px solid #34394b;
+  border-radius: 18px;
+  background: #1b2031;
+  color: #fff;
+  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.45);
+}
+
+.ticket-refund-dialog h2 {
+  margin: 0 0 14px;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.ticket-refund-dialog p {
+  margin: 0 0 24px;
+  color: #b9bdcc;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.ticket-refund-dialog p.profile-error {
+  margin-bottom: 20px;
+  color: #ff8585;
+}
+
+.ticket-refund-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.ticket-refund-actions button {
+  min-height: 42px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 30px;
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ticket-refund-cancel {
+  background: #353a4e;
+}
+
+.ticket-refund-confirm {
+  background: #ff3925;
+}
+
+.ticket-refund-actions button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

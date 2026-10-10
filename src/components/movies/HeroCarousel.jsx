@@ -5,7 +5,6 @@ import { Ticket, Clock3, ChevronLeft, ChevronRight } from "lucide-react";
 export default function HeroCarousel({ movies = [] }) {
   const [active, setActive] = useState(0);
 
-  // Automatically switch featured movies every 6 seconds
   useEffect(() => {
     if (movies.length <= 1) return;
 

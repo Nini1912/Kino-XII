@@ -7,19 +7,8 @@ import MovieDetailsPage from "./pages/MovieDetailsPage";
 import LoginModal from "./components/auth/LoginModal";
 import RegisterModal from "./components/auth/RegisterModal";
 import ProfilePage from "./pages/ProfilePage";
-
-function SessionsPage() {
-  return <h1>Sessions Page</h1>;
-}
-
-function SessionBookingPlaceholder() {
-  return (
-    <main style={{ padding: "130px 5%", minHeight: "80vh" }}>
-      <h1>Seat selection</h1>
-      <p>Booking functionality is coming next.</p>
-    </main>
-  );
-}
+import SessionsPage from "./pages/SessionsPage";
+import SessionBookingPage from "./pages/SessionBookingPage";
 
 export default function App() {
   return (
@@ -29,7 +18,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/sessions" element={<SessionsPage />} />
-        <Route path="/sessions/:id" element={<SessionBookingPlaceholder />} />
+        <Route path="/sessions/:id" element={<SessionBookingPage />} />
         <Route path="/movies/:id" element={<MovieDetailsPage />} />
         <Route path="/profile" element={<ProfilePage />} />
       </Routes>

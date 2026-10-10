@@ -1,0 +1,488 @@
+
+.sessions-page {
+  min-height: 100vh;
+  padding: 112px 5% 80px;
+  background: #080c1b;
+  color: #f7f7fb;
+  font-family: inherit;
+}
+
+.sessions-page *,
+.sessions-page *::before,
+.sessions-page *::after {
+  box-sizing: border-box;
+}
+
+.sessions-page-header {
+  margin-bottom: 34px;
+}
+
+.sessions-page-header h1 {
+  margin: 0 0 7px;
+  font-size: 27px;
+  font-weight: 800;
+}
+
+.sessions-page-header p {
+  margin: 0;
+  color: #9295a5;
+  font-size: 13px;
+}
+
+.sessions-page-layout {
+  display: grid;
+  grid-template-columns: 290px minmax(0, 1fr);
+  align-items: start;
+  gap: 45px;
+}
+
+.sessions-filters-sidebar {
+  padding: 23px 21px 18px;
+  border-radius: 15px;
+  background: #202232;
+}
+
+.sessions-filters-sidebar > h2 {
+  margin: 0 0 24px;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.sessions-filter-group {
+  margin-bottom: 23px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #303243;
+}
+
+.sessions-filter-group h3 {
+  margin: 0 0 13px;
+  color: #9295a5;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.sessions-filter-items {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sessions-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #d8d9e1;
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.sessions-checkbox-label input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.sessions-checkbox-custom {
+  position: relative;
+  display: inline-block;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  border: 1px solid #585b6b;
+  border-radius: 5px;
+  background: transparent;
+}
+
+.sessions-checkbox-label input:checked + .sessions-checkbox-custom {
+  border-color: #ff3b25;
+  background: #ff3b25;
+}
+
+.sessions-checkbox-label input:checked + .sessions-checkbox-custom::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 5px;
+  width: 4px;
+  height: 7px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.sessions-checkbox-label input:focus-visible + .sessions-checkbox-custom {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+.sessions-date-scroll {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.sessions-date-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.sessions-date-list {
+  display: flex;
+  gap: 6px;
+  width: max-content;
+}
+
+.sessions-date-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 37px;
+  height: 51px;
+  padding: 4px;
+  border: 0;
+  border-radius: 8px;
+  background: #2d3041;
+  color: #d5d5df;
+  cursor: pointer;
+}
+
+.sessions-date-button span {
+  font-size: 10px;
+}
+
+.sessions-date-button strong {
+  font-size: 12px;
+}
+
+.sessions-date-button.active {
+  background: #ff3b25;
+  color: #fff;
+}
+
+.sessions-filter-footer {
+  padding-top: 2px;
+  text-align: center;
+}
+
+.sessions-clear-filters {
+  width: 100%;
+  min-height: 32px;
+  border: 1px solid #797c8e;
+  border-radius: 20px;
+  background: transparent;
+  color: #f5f5fa;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sessions-clear-filters:hover {
+  border-color: #ff3b25;
+}
+
+.sessions-filter-footer p {
+  margin: 14px 0 0;
+  color: #9295a5;
+  font-size: 11px;
+}
+
+.sessions-results {
+  min-width: 0;
+}
+
+.sessions-results-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 29px;
+  margin-bottom: 24px;
+}
+
+.sessions-results-toolbar > strong {
+  font-size: 12px;
+}
+
+.sessions-sort {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12px;
+}
+
+.sessions-sort > span {
+  color: #8d91a3;
+}
+
+.sessions-sort select {
+  max-width: 240px;
+  border: 0;
+  outline: 0;
+  background: #080c1b;
+  color: #f6f6fb;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sessions-sort option {
+  background: #202232;
+}
+
+.sessions-movie-row {
+  padding: 0 0 28px;
+  margin-bottom: 29px;
+  border-bottom: 1px solid #25293b;
+}
+
+.sessions-movie-heading {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.sessions-movie-heading > img,
+.sessions-poster-placeholder {
+  flex: 0 0 53px;
+  width: 53px;
+  height: 76px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.sessions-poster-placeholder {
+  display: grid;
+  place-items: center;
+  background: #292d40;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.sessions-movie-title-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.sessions-movie-title-line h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.sessions-age-badge {
+  padding: 4px 8px;
+  border-radius: 20px;
+  background: rgba(255, 59, 37, 0.12);
+  color: #ff4935;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.sessions-movie-heading p {
+  margin: 8px 0 0;
+  color: #9699aa;
+  font-size: 12px;
+}
+
+.sessions-showtimes-scroll {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #373a4b transparent;
+}
+
+.sessions-showtimes {
+  display: flex;
+  gap: 11px;
+  width: max-content;
+  min-width: 100%;
+  padding-bottom: 4px;
+}
+
+.sessions-showtime-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  flex: 0 0 224px;
+  width: 224px;
+  min-height: 95px;
+  padding: 13px 15px;
+  border: 1px solid transparent;
+  border-radius: 13px;
+  background: #202232;
+  color: #f5f5fa;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.sessions-showtime-card:hover:not(:disabled) {
+  border-color: #ff3b25;
+  background: #282b3e;
+}
+
+.sessions-showtime-top,
+.sessions-showtime-middle,
+.sessions-showtime-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sessions-showtime-top strong {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.sessions-format-badge {
+  padding: 4px 9px;
+  border-radius: 20px;
+  background: #303345;
+  color: #dedee7;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.sessions-showtime-middle {
+  margin-top: 11px;
+  color: #a0a3b2;
+  font-size: 11px;
+}
+
+.sessions-seats-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: #35ce88;
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+.sessions-seats-count.low {
+  color: #ff523c;
+}
+
+.sessions-showtime-bottom {
+  margin-top: 7px;
+  font-size: 11px;
+}
+
+.sessions-showtime-bottom > span {
+  overflow: hidden;
+  color: #d4d5df;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sessions-showtime-bottom strong {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.sessions-showtime-card.is-sold-out {
+  background: #151827;
+  opacity: 0.52;
+  cursor: not-allowed;
+}
+
+.sessions-sold-out-label {
+  color: #999cac;
+}
+
+.sessions-state {
+  padding: 70px 20px;
+  border-radius: 12px;
+  background: #1c2030;
+  color: #b9bbca;
+  text-align: center;
+}
+
+.sessions-state button {
+  padding: 9px 20px;
+  border: 0;
+  border-radius: 20px;
+  background: #ff3b25;
+  color: #fff;
+  cursor: pointer;
+}
+
+.sessions-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 37px;
+}
+
+.sessions-pagination button {
+  display: grid;
+  place-items: center;
+  min-width: 35px;
+  height: 35px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #b5b8c8;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.sessions-pagination button:first-child,
+.sessions-pagination button:last-child {
+  background: #202232;
+}
+
+.sessions-pagination button.active {
+  background: #ff3b25;
+  color: #fff;
+  font-weight: 800;
+}
+
+.sessions-pagination button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+@media (max-width: 1100px) {
+  .sessions-page-layout {
+    grid-template-columns: 250px minmax(0, 1fr);
+    gap: 25px;
+  }
+
+  .sessions-showtime-card {
+    flex-basis: 200px;
+    width: 200px;
+  }
+}
+
+@media (max-width: 760px) {
+  .sessions-page {
+    padding: 95px 20px 55px;
+  }
+
+  .sessions-page-layout {
+    grid-template-columns: 1fr;
+    gap: 25px;
+  }
+
+  .sessions-filters-sidebar {
+    padding: 20px;
+  }
+
+  .sessions-results-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .sessions-showtime-card {
+    flex-basis: 190px;
+    width: 190px;
+  }
+}

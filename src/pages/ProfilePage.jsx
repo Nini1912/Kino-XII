@@ -4,6 +4,7 @@ import { CalendarDays, ChevronDown } from "lucide-react";
 
 import { profileApi } from "../api/profileApi";
 import { useAuth } from "../hooks/useAuth";
+import MyTickets from "../components/profile/MyTickets";
 import "../styles/profile.css";
 
 const asArray = (value) => {
@@ -422,40 +423,7 @@ export default function ProfilePage({ tickets = [], venues = [], onRefund }) {
             </form>
           </section>
         ) : (
-          <section className="profile-tickets-panel">
-            <div className="profile-ticket-filters">
-              <button
-                type="button"
-                className={ticketFilter === "upcoming" ? "active" : ""}
-                onClick={() => setTicketFilter("upcoming")}
-              >
-                Upcoming <span>{upcomingTickets.length}</span>
-              </button>
-              <button
-                type="button"
-                className={ticketFilter === "past" ? "active" : ""}
-                onClick={() => setTicketFilter("past")}
-              >
-                Past <span>{pastTickets.length}</span>
-              </button>
-            </div>
-
-            <div className="profile-ticket-list">
-              {displayedTickets.length > 0 ? (
-                displayedTickets.map((ticket, index) => (
-                  <TicketCard
-                    key={ticket.id ?? index}
-                    ticket={ticket}
-                    onRefund={onRefund}
-                  />
-                ))
-              ) : (
-                <div className="profile-tickets-empty">
-                  No {ticketFilter} tickets yet.
-                </div>
-              )}
-            </div>
-          </section>
+          <MyTickets />
         )}
       </div>
     </main>
