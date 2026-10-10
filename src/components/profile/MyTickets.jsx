@@ -31,10 +31,18 @@ function TicketCard({ order, onRefund, refunding }) {
   const format = session.format ?? {};
   const language = session.language ?? {};
 
+  const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+
+  const startsAt = Date.parse(session.startsAt);
+
+  const outsideRefundWindow =
+    Number.isFinite(startsAt) && startsAt - Date.now() > TWO_HOURS_MS;
+
   const canRefund =
     order.status === "paid" &&
     order.isUpcoming === true &&
-    order.isRefundable === true;
+    order.isRefundable === true &&
+    outsideRefundWindow;
 
   const ageRating =
     typeof movie.ageRating === "object"
@@ -129,9 +137,14 @@ function TicketCard({ order, onRefund, refunding }) {
         <small>
           {order.status === "refunded"
             ? "Refunded"
-            : canRefund
-              ? "Refund available"
-              : "Refund unavailable"}
+            : order.status === "paid" &&
+                order.isUpcoming === true &&
+                Number.isFinite(startsAt) &&
+                !outsideRefundWindow
+              ? "Refunds close 2 hours before the session"
+              : canRefund
+                ? "Refund available"
+                : "Refund unavailable"}
         </small>
       </div>
     </article>
