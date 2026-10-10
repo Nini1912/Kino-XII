@@ -29,7 +29,7 @@ const formatMoney = (n) =>
 const getError = (err) =>
   err?.response?.data?.message ?? err?.message ?? "Something went wrong.";
 
-function SeatGrid({ sections, selected, onToggle }) {
+function SeatGrid({ sections, selected, onToggle, disabled = false }) {
   const widest = Math.max(
     1,
     ...sections.flatMap((section) =>
@@ -51,7 +51,6 @@ function SeatGrid({ sections, selected, onToggle }) {
                 {row.seats.map((seat, seatIndex) => {
                   const picked = selected.some((s) => s.id === seat.id);
                   const available =
-                    picked ||
                     seat.status === "available" ||
                     (seat.status === "held" && seat.isMine);
                   return (
@@ -64,7 +63,7 @@ function SeatGrid({ sections, selected, onToggle }) {
                       ) : (
                         <button
                           type="button"
-                          disabled={!available}
+                          disabled={disabled || !available}
                           onClick={() => onToggle(seat)}
                           className={`kb-seat ${picked ? "kb-picked" : ""} ${!available ? `kb-${seat.status}` : ""}`}
                           aria-label={`${seat.code}, ${picked ? "selected" : seat.status}`}
@@ -298,24 +297,54 @@ export default function BookingModal({ sessionId, onClose }) {
   }, [seats, seatsQuery.data, hold]);
 
   function toggleSeat(seat) {
+    if (busy) return;
+
     if (sessionStarted) {
-      setError("That session has already started. Choose another showtime.");
-      return;
-    }
-    if (hold) {
       setError(
-        "Seats are already held. Continue to checkout or close this booking to start again.",
+        "This session has already started. Please choose another showtime.",
       );
       return;
     }
+
+    if (hold) {
+      setError(
+        "Seats are already reserved. Continue to checkout or release your hold to change seats.",
+      );
+      return;
+    }
+
+    const isAvailable =
+      seat.status === "available" || (seat.status === "held" && seat.isMine);
+
+    if (!isAvailable) {
+      setError(
+        `Seat ${seat.code} is no longer available. Please choose another seat.`,
+      );
+      return;
+    }
+
     setError("");
-    setSelected((prev) =>
-      prev.some((s) => s.id === seat.id)
-        ? prev.filter((s) => s.id !== seat.id)
-        : prev.length >= maxSeats
-          ? prev
-          : [...prev, { id: seat.id, code: seat.code, ticketType: "adult" }],
-    );
+
+    setSelected((previous) => {
+      const alreadySelected = previous.some((item) => item.id === seat.id);
+
+      if (alreadySelected) {
+        return previous.filter((item) => item.id !== seat.id);
+      }
+
+      if (previous.length >= maxSeats) {
+        return previous;
+      }
+
+      return [
+        ...previous,
+        {
+          id: seat.id,
+          code: seat.code,
+          ticketType: "adult",
+        },
+      ];
+    });
   }
 
   function changeTicketType(id, ticketType) {
@@ -324,77 +353,75 @@ export default function BookingModal({ sessionId, onClose }) {
     );
   }
 
-  
-async function handleConflict(err) {
-  const response = err.response?.data ?? {};
-  const rawContested = response.contested;
+  async function handleConflict(err) {
+    const response = err.response?.data ?? {};
+    const rawContested = response.contested;
 
-  // Support seat codes, numeric IDs and seat objects.
-  const contested = Array.isArray(rawContested) ? rawContested : [];
+    // Support seat codes, numeric IDs and seat objects.
+    const contested = Array.isArray(rawContested) ? rawContested : [];
 
-  const contestedCodes = new Set();
-  const contestedIds = new Set();
+    const contestedCodes = new Set();
+    const contestedIds = new Set();
 
-  contested.forEach((item) => {
-    if (typeof item === "string") {
-      contestedCodes.add(item);
-    } else if (typeof item === "number") {
-      contestedIds.add(String(item));
-    } else if (item && typeof item === "object") {
-      if (item.code != null) {
-        contestedCodes.add(String(item.code));
+    contested.forEach((item) => {
+      if (typeof item === "string") {
+        contestedCodes.add(item);
+      } else if (typeof item === "number") {
+        contestedIds.add(String(item));
+      } else if (item && typeof item === "object") {
+        if (item.code != null) {
+          contestedCodes.add(String(item.code));
+        }
+
+        const id = item.seatId ?? item.id;
+
+        if (id != null) {
+          contestedIds.add(String(id));
+        }
       }
+    });
 
-      const id = item.seatId ?? item.id;
+    setSelected((previous) =>
+      previous.filter(
+        (seat) =>
+          !contestedCodes.has(String(seat.code)) &&
+          !contestedIds.has(String(seat.id)),
+      ),
+    );
 
-      if (id != null) {
-        contestedIds.add(String(id));
-      }
+    setStep("seats");
+
+    if (contested.length > 0) {
+      const seatLabels = contested.map((item) => {
+        if (typeof item === "object" && item !== null) {
+          return item.code ?? item.seatId ?? item.id ?? "Unknown";
+        }
+
+        return item;
+      });
+
+      setError(
+        `These seats are no longer available: ${seatLabels.join(", ")}. Please select other seats.`,
+      );
+    } else {
+      setError(
+        response.message ??
+          "Some seats are no longer available. Please review the updated seat map.",
+      );
     }
-  });
 
-  setSelected((previous) =>
-    previous.filter(
-      (seat) =>
-        !contestedCodes.has(String(seat.code)) &&
-        !contestedIds.has(String(seat.id)),
-    ),
-  );
-
-  setStep("seats");
-
-  if (contested.length > 0) {
-    const seatLabels = contested.map((item) => {
-      if (typeof item === "object" && item !== null) {
-        return item.code ?? item.seatId ?? item.id ?? "Unknown";
-      }
-
-      return item;
-    });
-
-    setError(
-      `These seats are no longer available: ${seatLabels.join(", ")}. Please select other seats.`,
-    );
-  } else {
-    setError(
-      response.message ??
-        "Some seats are no longer available. Please review the updated seat map.",
-    );
+    // Refresh the seat map after the conflict.
+    try {
+      await queryClient.invalidateQueries({
+        queryKey: ["booking-seats", sessionId],
+      });
+    } catch (refreshError) {
+      console.error("Failed to refresh seats:", refreshError);
+      setError(
+        "Seat availability changed, but the map could not be refreshed. Please retry.",
+      );
+    }
   }
-
-  // Refresh the seat map after the conflict.
-  try {
-    await queryClient.invalidateQueries({
-      queryKey: ["booking-seats", sessionId],
-    });
-  } catch (refreshError) {
-    console.error("Failed to refresh seats:", refreshError);
-    setError(
-      "Seat availability changed, but the map could not be refreshed. Please retry.",
-    );
-  }
-}
-
 
   async function createBookingHold(currentUser) {
     setError("");
@@ -436,40 +463,41 @@ async function handleConflict(err) {
     await createBookingHold(user);
   }
 
-  
-async function updateHold() {
-  if (busy) return;
+  async function updateHold() {
+    if (busy) return;
 
-  if (!hold) {
-    setStep("seats");
-    return;
+    if (!hold) {
+      setStep("seats");
+      return;
+    }
+
+    setBusy(true);
+    setError("");
+
+    try {
+      await bookingApi.releaseHold(hold.holdId);
+
+      sessionStorage.removeItem(holdKey(sessionId));
+
+      holdRef.current = null;
+      setHold(null);
+      setSecondsLeft(0);
+      expiryHandledRef.current = false;
+
+      setStep("seats");
+
+      await queryClient.invalidateQueries({
+        queryKey: ["booking-seats", sessionId],
+      });
+    } catch (err) {
+      setError(
+        "Unable to release your previous reservation. Please try again.",
+      );
+      console.error("Failed to release hold:", err);
+    } finally {
+      setBusy(false);
+    }
   }
-
-  setBusy(true);
-  setError("");
-
-  try {
-    await bookingApi.releaseHold(hold.holdId);
-
-    sessionStorage.removeItem(holdKey(sessionId));
-
-    holdRef.current = null;
-    setHold(null);
-    setSecondsLeft(0);
-    expiryHandledRef.current = false;
-
-    setStep("seats");
-
-    await queryClient.invalidateQueries({
-      queryKey: ["booking-seats", sessionId],
-    });
-  } catch (err) {
-    setError("Unable to release your previous reservation. Please try again.");
-    console.error("Failed to release hold:", err);
-  } finally {
-    setBusy(false);
-  }
-}
 
   function changeForm(event) {
     const { name, value } = event.target;
@@ -695,6 +723,7 @@ async function updateHold() {
                           sections={sections}
                           selected={selected}
                           onToggle={toggleSeat}
+                          disabled={busy || Boolean(hold) || sessionStarted}
                         />
                       ) : (
                         <p className="kb-state">
