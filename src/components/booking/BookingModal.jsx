@@ -11,8 +11,12 @@ import {
   normalizeSections,
 } from "./seatLayout.jsx";
 import { parseApiError } from "../../utils/apiErrors";
-
 const holdKey = (id) => `kino_hold_${id}`;
+function isHoldExpired(hold) {
+  if (!hold?.expiresAt) return true;
+  const expiresAt = Date.parse(hold.expiresAt);
+  return !Number.isFinite(expiresAt) || expiresAt <= Date.now();
+}
 const emptyForm = {
   fullName: "",
   email: "",
@@ -28,7 +32,6 @@ const formatMoney = (n) =>
     .replace(/\.00$/, "")}`;
 const getError = (err) =>
   err?.response?.data?.message ?? err?.message ?? "Something went wrong.";
-
 function SeatGrid({ sections, selected, onToggle, disabled = false }) {
   const widest = Math.max(
     1,
@@ -102,7 +105,6 @@ function SeatGrid({ sections, selected, onToggle, disabled = false }) {
     </div>
   );
 }
-
 function Field({ label, name, value, onChange, error, ...props }) {
   return (
     <label className="kb-field">
@@ -116,7 +118,6 @@ function Field({ label, name, value, onChange, error, ...props }) {
     </label>
   );
 }
-
 export default function BookingModal({ sessionId, onClose }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -129,11 +130,15 @@ export default function BookingModal({ sessionId, onClose }) {
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
   const [secondsLeft, setSecondsLeft] = useState(0);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState(() => ({
+    ...emptyForm,
+    fullName: user?.fullName ?? "",
+    email: user?.email ?? "",
+    mobileNumber: user?.mobileNumber ?? "",
+  }));
   const closingRef = useRef(false);
   const holdRef = useRef(null);
   const expiryHandledRef = useRef(false);
-
   const sessionQuery = useQuery({
     queryKey: ["booking-session", sessionId],
     queryFn: () => bookingApi.session(sessionId),
@@ -154,6 +159,26 @@ export default function BookingModal({ sessionId, onClose }) {
     [seatsQuery.data],
   );
   const seats = useMemo(() => allSeats(sections), [sections]);
+
+  // Derive a safe selection instead of setting state inside an effect.
+  const availableSeatIds = useMemo(
+    () =>
+      new Set(
+        seats
+          .filter(
+            (seat) =>
+              seat.status === "available" ||
+              (seat.status === "held" && seat.isMine),
+          )
+          .map((seat) => String(seat.id)),
+      ),
+    [seats],
+  );
+
+  const validSelected = useMemo(() => {
+    if (hold || !seatsQuery.data) return selected;
+    return selected.filter((seat) => availableSeatIds.has(String(seat.id)));
+  }, [selected, availableSeatIds, hold, seatsQuery.data]);
   const types = useMemo(
     () => getTicketTypes(optionsQuery.data, session?.movie),
     [optionsQuery.data, session?.movie],
@@ -162,7 +187,7 @@ export default function BookingModal({ sessionId, onClose }) {
   const validTypes =
     types.length > 0 && types.some((type) => type.slug === "adult");
   const basePrice = Number(session?.price ?? 0);
-  const estimated = selected.reduce(
+  const estimated = validSelected.reduce(
     (sum, seat) =>
       sum +
       basePrice * (types.find((t) => t.slug === seat.ticketType)?.ratio ?? 1),
@@ -186,64 +211,76 @@ export default function BookingModal({ sessionId, onClose }) {
   const sessionStarted = Boolean(
     session?.startsAt && Date.parse(session.startsAt) <= Date.now(),
   );
-
-  useEffect(() => {
-    holdRef.current = hold;
-  }, [hold]);
-  useEffect(() => {
-    if (!user) return;
-    setForm((prev) => ({
-      ...prev,
-      fullName: prev.fullName || user.fullName || "",
-      email: prev.email || user.email || "",
-      mobileNumber: prev.mobileNumber || user.mobileNumber || "",
-    }));
-  }, [user]);
-
   const resetExpired = useCallback(async () => {
     if (expiryHandledRef.current) return;
     expiryHandledRef.current = true;
+    holdRef.current = null;
     sessionStorage.removeItem(holdKey(sessionId));
     setHold(null);
     setSelected([]);
+    setSecondsLeft(0);
     setStep("seats");
-    setError("Your hold time expired. Please re-select your seats.");
+    setFieldErrors({});
+    setError(
+      "Your seat reservation has expired. Please select your seats again.",
+    );
     await queryClient.invalidateQueries({
       queryKey: ["booking-seats", sessionId],
     });
   }, [queryClient, sessionId]);
-
   useEffect(() => {
-    const stored = sessionStorage.getItem(holdKey(sessionId));
-    if (!stored || !isAuthenticated) return;
+    if (!isAuthenticated) return;
+    const storedHoldId = sessionStorage.getItem(holdKey(sessionId));
+    if (!storedHoldId) return;
     let cancelled = false;
-    bookingApi
-      .getHold(stored)
-      .then((saved) => {
+    async function restoreHold() {
+      try {
+        const saved = await bookingApi.getHold(storedHoldId);
         if (cancelled) return;
-        if (!saved.isLive || Date.parse(saved.expiresAt) <= Date.now()) {
-          resetExpired();
+        if (!saved?.isLive || isHoldExpired(saved)) {
+          await resetExpired();
           return;
         }
         expiryHandledRef.current = false;
+        holdRef.current = saved;
         setHold(saved);
         setSelected(
           (saved.seats ?? []).map((seat) => ({
             id: seat.seatId,
             code: seat.code,
-            ticketType: seat.ticketType?.slug ?? "adult",
+            ticketType: seat.ticketType?.slug ?? seat.ticketType ?? "adult",
           })),
         );
+        setSecondsLeft(
+          Math.max(
+            0,
+            Math.ceil((Date.parse(saved.expiresAt) - Date.now()) / 1000),
+          ),
+        );
+        setError("");
         setStep("checkout");
-      })
-      .catch(() => {
-        if (!cancelled) sessionStorage.removeItem(holdKey(sessionId));
-      });
+      } catch (err) {
+        if (cancelled) return;
+        if ([404, 410].includes(err.response?.status)) {
+          sessionStorage.removeItem(holdKey(sessionId));
+          setHold(null);
+          holdRef.current = null;
+          setSelected([]);
+          setSecondsLeft(0);
+          setStep("seats");
+          setError("Your previous reservation is no longer available.");
+        } else {
+          setError(
+            "Could not restore your reservation. Please check your connection and reload.",
+          );
+        }
+      }
+    }
+    void restoreHold();
     return () => {
       cancelled = true;
     };
   }, [sessionId, isAuthenticated, resetExpired]);
-
   useEffect(() => {
     if (!hold?.expiresAt || step === "success") return;
     const tick = () => {
@@ -252,13 +289,15 @@ export default function BookingModal({ sessionId, onClose }) {
         Math.ceil((Date.parse(hold.expiresAt) - Date.now()) / 1000),
       );
       setSecondsLeft(remaining);
-      if (remaining === 0) resetExpired();
+      if (remaining === 0) void resetExpired();
     };
-    tick();
-    const timer = setInterval(tick, 1000);
-    return () => clearInterval(timer);
+    const timeout = window.setTimeout(tick, 0);
+    const timer = window.setInterval(tick, 1000);
+    return () => {
+      window.clearTimeout(timeout);
+      window.clearInterval(timer);
+    };
   }, [hold?.expiresAt, step, resetExpired]);
-
   const close = async () => {
     if (closingRef.current) return;
     closingRef.current = true;
@@ -273,7 +312,6 @@ export default function BookingModal({ sessionId, onClose }) {
     }
     onClose();
   };
-
   useEffect(() => {
     const onKey = (event) => {
       if (event.key === "Escape" && !busy) close();
@@ -281,61 +319,47 @@ export default function BookingModal({ sessionId, onClose }) {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   });
-
-  useEffect(() => {
-    if (hold || !seatsQuery.data) return;
-    const availableIds = new Set(
-      seats
-        .filter(
-          (seat) =>
-            seat.status === "available" ||
-            (seat.status === "held" && seat.isMine),
-        )
-        .map((seat) => seat.id),
-    );
-    setSelected((prev) => prev.filter((seat) => availableIds.has(seat.id)));
-  }, [seats, seatsQuery.data, hold]);
-
   function toggleSeat(seat) {
     if (busy) return;
-
     if (sessionStarted) {
       setError(
         "This session has already started. Please choose another showtime.",
       );
       return;
     }
-
     if (hold) {
       setError(
         "Seats are already reserved. Continue to checkout or release your hold to change seats.",
       );
       return;
     }
+    // Sidebar removal passes a selected item without a status field.
+    if (selected.some((item) => item.id === seat.id)) {
+      setSelected((previous) => previous.filter((item) => item.id !== seat.id));
+      setError("");
+      return;
+    }
 
     const isAvailable =
       seat.status === "available" || (seat.status === "held" && seat.isMine);
-
     if (!isAvailable) {
       setError(
         `Seat ${seat.code} is no longer available. Please choose another seat.`,
       );
       return;
     }
-
     setError("");
-
     setSelected((previous) => {
       const alreadySelected = previous.some((item) => item.id === seat.id);
-
       if (alreadySelected) {
         return previous.filter((item) => item.id !== seat.id);
       }
-
-      if (previous.length >= maxSeats) {
+      if (
+        previous.filter((item) => availableSeatIds.has(String(item.id)))
+          .length >= maxSeats
+      ) {
         return previous;
       }
-
       return [
         ...previous,
         {
@@ -346,23 +370,17 @@ export default function BookingModal({ sessionId, onClose }) {
       ];
     });
   }
-
   function changeTicketType(id, ticketType) {
     setSelected((prev) =>
       prev.map((seat) => (seat.id === id ? { ...seat, ticketType } : seat)),
     );
   }
-
   async function handleConflict(err) {
     const response = err.response?.data ?? {};
     const rawContested = response.contested;
-
-    // Support seat codes, numeric IDs and seat objects.
     const contested = Array.isArray(rawContested) ? rawContested : [];
-
     const contestedCodes = new Set();
     const contestedIds = new Set();
-
     contested.forEach((item) => {
       if (typeof item === "string") {
         contestedCodes.add(item);
@@ -372,15 +390,12 @@ export default function BookingModal({ sessionId, onClose }) {
         if (item.code != null) {
           contestedCodes.add(String(item.code));
         }
-
         const id = item.seatId ?? item.id;
-
         if (id != null) {
           contestedIds.add(String(id));
         }
       }
     });
-
     setSelected((previous) =>
       previous.filter(
         (seat) =>
@@ -388,18 +403,14 @@ export default function BookingModal({ sessionId, onClose }) {
           !contestedIds.has(String(seat.id)),
       ),
     );
-
     setStep("seats");
-
     if (contested.length > 0) {
       const seatLabels = contested.map((item) => {
         if (typeof item === "object" && item !== null) {
           return item.code ?? item.seatId ?? item.id ?? "Unknown";
         }
-
         return item;
       });
-
       setError(
         `These seats are no longer available: ${seatLabels.join(", ")}. Please select other seats.`,
       );
@@ -409,8 +420,6 @@ export default function BookingModal({ sessionId, onClose }) {
           "Some seats are no longer available. Please review the updated seat map.",
       );
     }
-
-    // Refresh the seat map after the conflict.
     try {
       await queryClient.invalidateQueries({
         queryKey: ["booking-seats", sessionId],
@@ -422,7 +431,6 @@ export default function BookingModal({ sessionId, onClose }) {
       );
     }
   }
-
   async function createBookingHold(currentUser) {
     setError("");
     if (!currentUser?.profileComplete) {
@@ -433,13 +441,23 @@ export default function BookingModal({ sessionId, onClose }) {
       setError("That session has already started. Choose another showtime.");
       return;
     }
-    if (!selected.length || !validTypes || busy) return;
+    if (!validSelected.length || !validTypes || busy) return;
     setBusy(true);
     try {
-      const result = await bookingApi.createHold(sessionId, selected);
+      const result = await bookingApi.createHold(sessionId, validSelected);
+      if (!result?.holdId || isHoldExpired(result)) {
+        throw new Error("The server did not return a valid seat reservation.");
+      }
       expiryHandledRef.current = false;
+      holdRef.current = result;
       setHold(result);
       sessionStorage.setItem(holdKey(sessionId), result.holdId);
+      setSecondsLeft(
+        Math.max(
+          0,
+          Math.ceil((Date.parse(result.expiresAt) - Date.now()) / 1000),
+        ),
+      );
       setStep("checkout");
     } catch (err) {
       if (err.response?.status === 409) await handleConflict(err);
@@ -453,7 +471,6 @@ export default function BookingModal({ sessionId, onClose }) {
       setBusy(false);
     }
   }
-
   async function proceed() {
     if (!isAuthenticated) {
       requireLogin((loggedInUser) => createBookingHold(loggedInUser));
@@ -462,30 +479,22 @@ export default function BookingModal({ sessionId, onClose }) {
     }
     await createBookingHold(user);
   }
-
   async function updateHold() {
     if (busy) return;
-
     if (!hold) {
       setStep("seats");
       return;
     }
-
     setBusy(true);
     setError("");
-
     try {
       await bookingApi.releaseHold(hold.holdId);
-
       sessionStorage.removeItem(holdKey(sessionId));
-
       holdRef.current = null;
       setHold(null);
       setSecondsLeft(0);
       expiryHandledRef.current = false;
-
       setStep("seats");
-
       await queryClient.invalidateQueries({
         queryKey: ["booking-seats", sessionId],
       });
@@ -498,16 +507,18 @@ export default function BookingModal({ sessionId, onClose }) {
       setBusy(false);
     }
   }
-
   function changeForm(event) {
     const { name, value } = event.target;
     setForm((prev) => ({ ...prev, [name]: value }));
     setFieldErrors((prev) => ({ ...prev, [name]: undefined }));
   }
-
   async function pay(event) {
     event.preventDefault();
     if (!hold || busy) return;
+    if (isHoldExpired(hold)) {
+      await resetExpired();
+      return;
+    }
     setBusy(true);
     setError("");
     setFieldErrors({});
@@ -515,6 +526,7 @@ export default function BookingModal({ sessionId, onClose }) {
       const result = await bookingApi.pay({ holdId: hold.holdId, ...form });
       sessionStorage.removeItem(holdKey(sessionId));
       setOrder(result);
+      holdRef.current = null;
       setHold(null);
       setStep("success");
       queryClient.invalidateQueries({ queryKey: ["tickets"] });
@@ -522,7 +534,6 @@ export default function BookingModal({ sessionId, onClose }) {
     } catch (err) {
       const status = err.response?.status;
       const parsed = parseApiError(err);
-
       if (status === 409) {
         await handleConflict(err);
       } else if (parsed.type === "validation") {
@@ -530,7 +541,6 @@ export default function BookingModal({ sessionId, onClose }) {
         setError("");
       } else if (parsed.type === "rule") {
         const isExpiredHold = /hold|expired/i.test(parsed.message);
-
         if (isExpiredHold) {
           await resetExpired();
           setError(parsed.message);
@@ -547,7 +557,6 @@ export default function BookingModal({ sessionId, onClose }) {
       setBusy(false);
     }
   }
-
   const ticketSummary = (tickets) => {
     const counts = tickets.reduce((acc, item) => {
       const key =
@@ -564,7 +573,6 @@ export default function BookingModal({ sessionId, onClose }) {
   };
   const heading = order?.session ?? session;
   const canCheckout = Boolean(hold && secondsLeft > 0);
-
   return (
     <div
       className="kb-overlay"
@@ -721,7 +729,7 @@ export default function BookingModal({ sessionId, onClose }) {
                       {sections.length ? (
                         <SeatGrid
                           sections={sections}
-                          selected={selected}
+                          selected={validSelected}
                           onToggle={toggleSeat}
                           disabled={busy || Boolean(hold) || sessionStarted}
                         />
@@ -816,7 +824,7 @@ export default function BookingModal({ sessionId, onClose }) {
                         carry its own ticket type.
                       </p>
                       <div className="kb-seat-selection-list">
-                        {selected.map((seat) => (
+                        {validSelected.map((seat) => (
                           <div className="kb-selection" key={seat.id}>
                             <div className="kb-selection-head">
                               <span>
@@ -843,7 +851,7 @@ export default function BookingModal({ sessionId, onClose }) {
                                 <button
                                   type="button"
                                   key={type.slug}
-                                  disabled={Boolean(hold)}
+                                  disabled={busy || Boolean(hold)}
                                   className={
                                     seat.ticketType === type.slug
                                       ? "active"
@@ -896,7 +904,7 @@ export default function BookingModal({ sessionId, onClose }) {
                         disabled={
                           busy ||
                           sessionStarted ||
-                          !selected.length ||
+                          !validSelected.length ||
                           !validTypes ||
                           !sections.length ||
                           Boolean(hold)
