@@ -323,23 +323,77 @@ export default function BookingModal({ sessionId, onClose }) {
     );
   }
 
-  async function handleConflict(err) {
-    const contested = err.response?.data?.contested ?? [];
-    setSelected((prev) =>
-      prev.filter((seat) => !contested.includes(seat.code)),
-    );
-    setHold(null);
-    setStep("seats");
-    sessionStorage.removeItem(holdKey(sessionId));
+  
+async function handleConflict(err) {
+  const response = err.response?.data ?? {};
+  const rawContested = response.contested;
+
+  // Support seat codes, numeric IDs and seat objects.
+  const contested = Array.isArray(rawContested) ? rawContested : [];
+
+  const contestedCodes = new Set();
+  const contestedIds = new Set();
+
+  contested.forEach((item) => {
+    if (typeof item === "string") {
+      contestedCodes.add(item);
+    } else if (typeof item === "number") {
+      contestedIds.add(String(item));
+    } else if (item && typeof item === "object") {
+      if (item.code != null) {
+        contestedCodes.add(String(item.code));
+      }
+
+      const id = item.seatId ?? item.id;
+
+      if (id != null) {
+        contestedIds.add(String(id));
+      }
+    }
+  });
+
+  setSelected((previous) =>
+    previous.filter(
+      (seat) =>
+        !contestedCodes.has(String(seat.code)) &&
+        !contestedIds.has(String(seat.id)),
+    ),
+  );
+
+  setStep("seats");
+
+  if (contested.length > 0) {
+    const seatLabels = contested.map((item) => {
+      if (typeof item === "object" && item !== null) {
+        return item.code ?? item.seatId ?? item.id ?? "Unknown";
+      }
+
+      return item;
+    });
+
     setError(
-      contested.length
-        ? `These seats were just taken: ${contested.join(", ")}. Please choose other seats.`
-        : getError(err),
+      `These seats are no longer available: ${seatLabels.join(", ")}. Please select other seats.`,
     );
+  } else {
+    setError(
+      response.message ??
+        "Some seats are no longer available. Please review the updated seat map.",
+    );
+  }
+
+  // Refresh the seat map after the conflict.
+  try {
     await queryClient.invalidateQueries({
       queryKey: ["booking-seats", sessionId],
     });
+  } catch (refreshError) {
+    console.error("Failed to refresh seats:", refreshError);
+    setError(
+      "Seat availability changed, but the map could not be refreshed. Please retry.",
+    );
   }
+}
+
 
   async function createBookingHold(currentUser) {
     setError("");
