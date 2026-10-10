@@ -7,7 +7,27 @@ export const authApi = {
   },
 
   register: async (payload) => {
-    const { data } = await api.post("/register", payload);
+    const { avatar, ...fields } = payload;
+
+    if (avatar instanceof File) {
+      const formData = new FormData();
+
+      Object.entries(fields).forEach(([key, value]) => {
+        formData.append(key, value);
+      });
+
+      formData.append("avatar", avatar);
+
+      const { data } = await api.post("/register", formData, {
+        headers: {
+          "Content-Type": undefined,
+        },
+      });
+
+      return data;
+    }
+
+    const { data } = await api.post("/register", fields);
     return data;
   },
 

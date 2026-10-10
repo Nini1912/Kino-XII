@@ -41,6 +41,15 @@ export function AuthProvider({ children }) {
     setUser(null);
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    const response = await authApi.me();
+    const userData = response.data ?? response;
+    const currentUser = userData.user ?? userData;
+
+    setUser(currentUser);
+    return currentUser;
+  }, []);
+
   useEffect(() => {
     let active = true;
 
@@ -55,9 +64,11 @@ export function AuthProvider({ children }) {
 
       try {
         const response = await authApi.me();
+        const userData = response.data ?? response;
+        const currentUser = userData.user ?? userData;
 
         if (active) {
-          setUser(response.user ?? response);
+          setUser(currentUser);
         }
       } catch (error) {
         if (active) {
@@ -95,9 +106,10 @@ export function AuthProvider({ children }) {
 
   const login = async (credentials) => {
     const response = await authApi.login(credentials);
+    const loginData = response.data ?? response;
 
-    const accessToken =
-      response.token ?? response.accessToken ?? response.access_token;
+    const accessToken = loginData.token;
+    const currentUser = loginData.user;
 
     if (!accessToken) {
       throw new Error("Login response did not contain an access token.");
@@ -105,10 +117,7 @@ export function AuthProvider({ children }) {
 
     localStorage.setItem(TOKEN_KEY, accessToken);
     setToken(accessToken);
-
-    const currentUser = response.user ?? (await authApi.me());
-
-    setUser(currentUser.user ?? currentUser);
+    setUser(currentUser);
 
     closeLogin();
     closeRegister();
@@ -118,24 +127,22 @@ export function AuthProvider({ children }) {
 
   const register = async (payload) => {
     const response = await authApi.register(payload);
+    const registrationData = response.data ?? response;
 
-    const accessToken =
-      response.token ?? response.accessToken ?? response.access_token;
+    const accessToken = registrationData.token;
+    const currentUser = registrationData.user;
 
     if (accessToken) {
       localStorage.setItem(TOKEN_KEY, accessToken);
       setToken(accessToken);
-
-      const currentUser = response.user ?? (await authApi.me());
-
-      setUser(currentUser.user ?? currentUser);
+      setUser(currentUser ?? null);
       closeRegister();
     } else {
       closeRegister();
       openLogin();
     }
 
-    return response;
+    return registrationData;
   };
 
   const logout = async () => {
@@ -165,6 +172,7 @@ export function AuthProvider({ children }) {
         login,
         register,
         logout,
+        refreshUser,
       }}
     >
       {children}

@@ -172,6 +172,7 @@ export default function RegisterModal() {
         email: values.email.trim(),
         password: values.password,
         password_confirmation: values.password_confirmation,
+        avatar,
       };
 
       await register(payload);

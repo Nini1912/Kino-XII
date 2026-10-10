@@ -17,7 +17,14 @@ export const moviesApi = {
   },
 
   getMovie: async (id) => {
-    const response = await api.get(`/movies/${id}`);
+    const response = await api.get(`/movies/${encodeURIComponent(id)}`);
+    return response.data;
+  },
+
+  getMovieSessions: async (id) => {
+    const response = await api.get(
+      `/movies/${encodeURIComponent(id)}/sessions`,
+    );
     return response.data;
   },
 };
