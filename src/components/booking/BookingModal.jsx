@@ -381,33 +381,40 @@ export default function BookingModal({ sessionId, onClose }) {
     await createBookingHold(user);
   }
 
-  async function updateHold() {
-    if (!hold) return;
+  
+async function updateHold() {
+  if (busy) return;
+
+  if (!hold) {
     setStep("seats");
-    setError("");
+    return;
   }
 
-  async function replaceHold() {
-    setError("");
-    if (sessionStarted) {
-      setError("That session has already started. Choose another showtime.");
-      return;
-    }
-    if (!selected.length) return;
-    setBusy(true);
-    try {
-      const result = await bookingApi.createHold(sessionId, selected);
-      expiryHandledRef.current = false;
-      setHold(result);
-      sessionStorage.setItem(holdKey(sessionId), result.holdId);
-      setStep("checkout");
-    } catch (err) {
-      if (err.response?.status === 409) await handleConflict(err);
-      else setError(getError(err));
-    } finally {
-      setBusy(false);
-    }
+  setBusy(true);
+  setError("");
+
+  try {
+    await bookingApi.releaseHold(hold.holdId);
+
+    sessionStorage.removeItem(holdKey(sessionId));
+
+    holdRef.current = null;
+    setHold(null);
+    setSecondsLeft(0);
+    expiryHandledRef.current = false;
+
+    setStep("seats");
+
+    await queryClient.invalidateQueries({
+      queryKey: ["booking-seats", sessionId],
+    });
+  } catch (err) {
+    setError("Unable to release your previous reservation. Please try again.");
+    console.error("Failed to release hold:", err);
+  } finally {
+    setBusy(false);
   }
+}
 
   function changeForm(event) {
     const { name, value } = event.target;
@@ -598,11 +605,14 @@ export default function BookingModal({ sessionId, onClose }) {
                     <button
                       type="button"
                       className={step === "seats" ? "active" : ""}
+                      disabled={busy}
                       onClick={() => {
-                        if (step === "checkout") updateHold();
+                        if (step === "checkout") {
+                          void updateHold();
+                        }
                       }}
                     >
-                      SEATS
+                      {busy && step === "checkout" ? "Releasing..." : "SEATS"}
                     </button>
                     <button
                       type="button"
