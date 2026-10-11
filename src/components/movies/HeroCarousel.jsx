@@ -4,12 +4,14 @@ import { Ticket, Clock3, ChevronLeft, ChevronRight } from "lucide-react";
 
 export default function HeroCarousel({ movies = [] }) {
   const [active, setActive] = useState(0);
+  const [transitionKey, setTransitionKey] = useState(0);
 
   useEffect(() => {
     if (movies.length <= 1) return;
 
     const interval = setInterval(() => {
       setActive((current) => (current + 1) % movies.length);
+      setTransitionKey((key) => key + 1);
     }, 6000);
 
     return () => clearInterval(interval);
@@ -42,10 +44,12 @@ export default function HeroCarousel({ movies = [] }) {
 
   function nextMovie() {
     setActive((current) => (current + 1) % movies.length);
+      setTransitionKey((key) => key + 1);
   }
 
   function previousMovie() {
     setActive((current) => (current - 1 + movies.length) % movies.length);
+    setTransitionKey((key) => key + 1);
   }
 
   return (
@@ -101,13 +105,16 @@ export default function HeroCarousel({ movies = [] }) {
 
       {movies.length > 1 && (
         <div className="hero-controls">
-          <div className="hero-progress">
+          <div className="hero-progress" key={transitionKey}>
             {movies.map((featuredMovie, index) => (
               <button
                 key={featuredMovie.id ?? featuredMovie.slug ?? index}
                 type="button"
                 className={index === active ? "active" : ""}
-                onClick={() => setActive(index)}
+                onClick={() => {
+                  setActive(index);
+                  setTransitionKey((key) => key + 1);
+                }}
                 aria-label={`Show featured movie ${index + 1}`}
                 aria-current={index === active ? "true" : undefined}
               />

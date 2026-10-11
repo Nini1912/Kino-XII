@@ -327,29 +327,33 @@
 }
 
 .hero-progress button {
-
+  position: relative;
   flex: 1;
-
   height: 3px;
-
   padding: 0;
-
   border: 0;
-
   border-radius: 0;
-
   background: rgba(255, 255, 255, 0.65);
-
   cursor: pointer;
-
-  transition: background 0.2s;
-
+  overflow: hidden;
 }
 
-.hero-progress button.active {
-
+.hero-progress button::after {
+  content: "";
+  position: absolute;
+  inset: 0;
   background: #ff3b20;
+  transform: scaleX(0);
+  transform-origin: left center;
+}
 
+.hero-progress button.active::after {
+  animation: hero-progress-fill 6000ms linear forwards;
+}
+
+@keyframes hero-progress-fill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
 }
 
 .hero-arrows {
