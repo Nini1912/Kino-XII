@@ -29,14 +29,11 @@ export default function HeroCarousel({ movies = [] }) {
     movie.posterUrl ??
     movie.poster;
 
-  const duration = movie.duration_minutes ?? movie.duration;
+  const duration = movie.runtimeMinutes;
 
-  const ageRating =
-    typeof movie.age_rating === "object"
-      ? (movie.age_rating?.label ?? movie.age_rating?.name)
-      : movie.age_rating;
+  const ageRating = movie.ageRating?.code;
 
-  const formats = Array.isArray(movie.formats) ? movie.formats : [];
+  const formats = movie.formats ?? [];
 
   const description = movie.synopsis ?? movie.description ?? "";
 
@@ -67,23 +64,22 @@ export default function HeroCarousel({ movies = [] }) {
         <h1>{movie.title}</h1>
 
         <div className="hero-meta">
-          {ageRating && <span className="hero-age">{ageRating}</span>}
+          {ageRating && (
+            <span className="hero-meta-badge hero-meta-age">{ageRating}</span>
+          )}
 
           {duration && (
-            <span>
+            <span className="hero-meta-badge">
               <Clock3 size={15} />
               {duration} Min
             </span>
           )}
 
-          {formats.map((format, index) => {
-            const name =
-              typeof format === "string"
-                ? format
-                : (format.name ?? format.label);
-
-            return <span key={format.id ?? name ?? index}>{name}</span>;
-          })}
+          {formats.map((format) => (
+            <span key={format.id} className="hero-meta-badge">
+              {format.name}
+            </span>
+          ))}
         </div>
 
         {description && <p className="hero-description">{description}</p>}

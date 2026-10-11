@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Eye, EyeOff, X } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Check, CircleAlert, X } from "lucide-react";
 
 import { useAuth } from "../../hooks/useAuth";
 import "./auth.css";
@@ -11,7 +12,6 @@ export default function LoginModal() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
 
   const [touched, setTouched] = useState({});
   const [fieldErrors, setFieldErrors] = useState({});
@@ -46,7 +46,11 @@ export default function LoginModal() {
       ? "Enter a valid email address"
       : "";
 
-  const passwordError = !password ? "Password is required" : "";
+  const passwordError = !password
+    ? "Password is required"
+    : password.length < 3
+      ? "Password must be at least 3 characters"
+      : "";
 
   const emailMessage = fieldErrors.email || (touched.email ? emailError : "");
 
@@ -56,7 +60,6 @@ export default function LoginModal() {
   function resetForm() {
     setEmail("");
     setPassword("");
-    setShowPassword(false);
     setTouched({});
     setFieldErrors({});
     setServerError("");
@@ -128,7 +131,7 @@ export default function LoginModal() {
     }
   }
 
-  return (
+  return createPortal(
     <div
       className="auth-overlay"
       onMouseDown={(event) => {
@@ -138,7 +141,7 @@ export default function LoginModal() {
       }}
     >
       <section
-        className="auth-modal"
+        className="auth-modal register-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="login-title"
@@ -154,18 +157,19 @@ export default function LoginModal() {
         </button>
 
         <div className="auth-heading">
-          <h2 id="login-title">Welcome back</h2>
-          <p>Log in to your Kino XII account</p>
+          <h2 id="login-title">Log in</h2>
+          <p>Welcome back to Kino XII</p>
         </div>
 
         <form onSubmit={handleSubmit} noValidate>
           <div className="auth-field">
             <label htmlFor="login-email">Email</label>
 
-            <input
+            <div className="auth-input-wrap">
+              <input
               id="login-email"
               type="email"
-              placeholder="Enter your email"
+              placeholder="example@gmail.com"
               autoComplete="email"
               value={email}
               disabled={isSubmitting}
@@ -189,6 +193,13 @@ export default function LoginModal() {
               aria-invalid={Boolean(emailMessage)}
             />
 
+              {touched.email && (
+                <span className={`auth-validation-icon ${emailMessage ? "is-invalid" : "is-valid"}`}>
+                  {emailMessage ? <CircleAlert size={15} /> : <Check size={17} />}
+                </span>
+              )}
+            </div>
+
             {emailMessage && (
               <span className="auth-field-error">{emailMessage}</span>
             )}
@@ -200,8 +211,8 @@ export default function LoginModal() {
             <div className="auth-password-wrap">
               <input
                 id="login-password"
-                type={showPassword ? "text" : "password"}
-                placeholder="Enter your password"
+                type="password"
+                placeholder="••••••••"
                 autoComplete="current-password"
                 value={password}
                 disabled={isSubmitting}
@@ -224,15 +235,11 @@ export default function LoginModal() {
                 }
                 aria-invalid={Boolean(passwordMessage)}
               />
-
-              <button
-                type="button"
-                className="auth-password-toggle"
-                onClick={() => setShowPassword((value) => !value)}
-                aria-label={showPassword ? "Hide password" : "Show password"}
-              >
-                {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
-              </button>
+              {touched.password && (
+                <span className={`auth-validation-icon ${passwordMessage ? "is-invalid" : "is-valid"}`}>
+                  {passwordMessage ? <CircleAlert size={15} /> : <Check size={17} />}
+                </span>
+              )}
             </div>
 
             {passwordMessage && (
@@ -247,7 +254,7 @@ export default function LoginModal() {
           )}
 
           <button type="submit" className="auth-submit" disabled={isSubmitting}>
-            {isSubmitting ? "Logging in..." : "Log In"}
+            {isSubmitting ? "Logging in..." : "Log in"}
           </button>
         </form>
 
@@ -264,5 +271,6 @@ export default function LoginModal() {
         </p>
       </section>
     </div>
+    , document.body
   );
 }

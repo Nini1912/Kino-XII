@@ -708,7 +708,6 @@
     margin-bottom: 15px;
   }
 }
-/* Small laptop screens: remain usable; scrolling only when the screen truly cannot fit. */
 @media (min-width: 751px) and (max-height: 700px) {
   .kb-dialog {
     overflow-y: auto;
@@ -805,4 +804,70 @@
 .kb-page-state button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+/* Booking seat-map labels and consistent legend swatches */
+.kb-section-rows {
+  color: #a5a8b9;
+  font-weight: 500;
+  text-transform: none;
+}
+.kb-key {
+  box-sizing: border-box;
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+}
+.kb-key-available {
+  background: #202436;
+  border: 1px solid #424658;
+}
+.kb-key-selected {
+  background: #ff321d;
+  border: 1px solid #ff321d;
+}
+.kb-key-sold {
+  background: #202232;
+  border: 1px solid #202232;
+}
+.kb-key-held {
+  background: repeating-linear-gradient(135deg, #252a3c 0, #252a3c 8px, #363b4c 8px, #363b4c 15px);
+  border: 1px solid #313648;
+}
+
+.kb-seat.kb-held,
+.kb-key-held {
+  background: repeating-linear-gradient(135deg, #252a3c 0px, #252a3c 5px, #52586b 5px, #52586b 8px) !important;
+  border-color: #52586b;
+}
+
+.kb-input-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.kb-input-wrap input {
+  width: 100%;
+  padding-right: 42px;
+  box-sizing: border-box;
+}
+
+.kb-input-icon {
+  position: absolute;
+  right: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.kb-input-valid {
+  color: #22c55e;
+}
+
+.kb-input-error {
+  color: #ef4444;
+}
+
+.kb-input-wrap input.kb-input-invalid {
+  border-color: #ef4444;
 }

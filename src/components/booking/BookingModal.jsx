@@ -30,6 +30,30 @@ const formatMoney = (n) =>
   `₾ ${Number(n ?? 0)
     .toFixed(2)
     .replace(/\.00$/, "")}`;
+function formatSessionDate(session) {
+  const date = session?.date ?? session?.startsAt?.slice(0, 10);
+  if (!date) return "";
+  const parsed = new Date(`${date}T12:00:00`);
+  return Number.isNaN(parsed.getTime())
+    ? date
+    : new Intl.DateTimeFormat("en-GB", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+      }).format(parsed);
+}
+function sessionSummary(session) {
+  return [
+    session?.venue?.name ?? session?.hall?.venue?.name,
+    session?.hall?.name ? `Hall ${session.hall.name}` : null,
+    formatSessionDate(session),
+    session?.time,
+    session?.format?.name,
+    session?.language?.name,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
 const getError = (err) =>
   err?.response?.data?.message ?? err?.message ?? "Something went wrong.";
 function SeatGrid({ sections, selected, onToggle, disabled = false }) {
@@ -46,7 +70,7 @@ function SeatGrid({ sections, selected, onToggle, disabled = false }) {
       <div className="kb-screen">SCREEN</div>
       {sections.map((section, index) => (
         <section className="kb-section" key={`${section.name}-${index}`}>
-          <h3>{section.name}</h3>
+          <h3>{section.name} </h3>
           {section.rows.map((row, rowIndex) => (
             <div className="kb-row" key={`${row.label}-${rowIndex}`}>
               <span className="kb-row-name">{row.label}</span>
@@ -121,7 +145,14 @@ function Field({ label, name, value, onChange, error, ...props }) {
 export default function BookingModal({ sessionId, onClose }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user, isAuthenticated, openLogin, requireLogin } = useAuth();
+  const {
+    user,
+    isAuthenticated,
+    isLoginOpen,
+    isRegisterOpen,
+    openLogin,
+    requireLogin,
+  } = useAuth();
   const [selected, setSelected] = useState([]);
   const [step, setStep] = useState("seats");
   const [hold, setHold] = useState(null);
@@ -163,7 +194,6 @@ export default function BookingModal({ sessionId, onClose }) {
     [seatsQuery.data],
   );
   const seats = useMemo(() => allSeats(sections), [sections]);
-
   // Derive a safe selection instead of setting state inside an effect.
   const availableSeatIds = useMemo(
     () =>
@@ -178,7 +208,6 @@ export default function BookingModal({ sessionId, onClose }) {
       ),
     [seats],
   );
-
   const validSelected = useMemo(() => {
     if (hold || !seatsQuery.data) return selected;
     return selected.filter((seat) => availableSeatIds.has(String(seat.id)));
@@ -265,13 +294,11 @@ export default function BookingModal({ sessionId, onClose }) {
         setStep("checkout");
       } catch (err) {
         if (cancelled) return;
-
         if (!saved?.isLive || isHoldExpired(saved)) {
           setRestorationStatus("idle");
           await resetExpired();
           return;
         }
-
         setRestorationStatus("ready");
         if ([404, 410].includes(err.response?.status)) {
           setRestorationStatus("idle");
@@ -324,11 +351,20 @@ export default function BookingModal({ sessionId, onClose }) {
         console.warn("Hold release failed", err);
       }
     }
-    onClose();
+    const movieIdentifier =
+      session?.movie?.slug ?? session?.movie?.id ?? session?.movieId;
+    if (movieIdentifier != null && movieIdentifier !== "") {
+      navigate(`/movies/${encodeURIComponent(movieIdentifier)}`, {
+        replace: true,
+      });
+    } else {
+      onClose();
+    }
   };
   useEffect(() => {
     const onKey = (event) => {
-      if (event.key === "Escape" && !busy) close();
+      if (event.key === "Escape" && !busy && !isLoginOpen && !isRegisterOpen)
+        close();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -353,7 +389,6 @@ export default function BookingModal({ sessionId, onClose }) {
       setError("");
       return;
     }
-
     const isAvailable =
       seat.status === "available" || (seat.status === "held" && seat.isMine);
     if (!isAvailable) {
@@ -465,7 +500,6 @@ export default function BookingModal({ sessionId, onClose }) {
     ) {
       return;
     }
-
     requestLockRef.current = true;
     setBusy(true);
     try {
@@ -500,7 +534,6 @@ export default function BookingModal({ sessionId, onClose }) {
   async function proceed() {
     if (!isAuthenticated) {
       requireLogin((loggedInUser) => createBookingHold(loggedInUser));
-      setError("Log in to continue booking.");
       return;
     }
     await createBookingHold(user);
@@ -557,6 +590,7 @@ export default function BookingModal({ sessionId, onClose }) {
       setHold(null);
       setStep("success");
       queryClient.invalidateQueries({ queryKey: ["tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["my-tickets"] });
       queryClient.invalidateQueries({ queryKey: ["booking-seats", sessionId] });
     } catch (err) {
       const status = err.response?.status;
@@ -687,20 +721,18 @@ export default function BookingModal({ sessionId, onClose }) {
             <header className="kb-header">
               <div>
                 <h2>{session?.movie?.title ?? "Booking"}</h2>
-                <p>
-                  {session?.venue?.name} · Hall {session?.hall?.name} ·{" "}
-                  {session?.date} · {session?.time} · {session?.format?.name} ·{" "}
-                  {session?.language?.name}
-                </p>
+                <p>{sessionSummary(session)}</p>
               </div>
-              <div className="kb-timer" aria-live="off">
-                <span>{hold ? "SEATS HELD" : "NOT HELD"}</span>
-                <strong>
-                  {hold
-                    ? `${Math.floor(secondsLeft / 60)}:${pad(secondsLeft % 60)}`
-                    : "--:--"}
-                </strong>
-              </div>
+              {step === "checkout" && hold && (
+                <div className="kb-timer" aria-live="off">
+                  <span>{hold ? "SEATS HELD" : "NOT HELD"}</span>
+                  <strong>
+                    {hold
+                      ? `${Math.floor(secondsLeft / 60)}:${pad(secondsLeft % 60)}`
+                      : "--:--"}
+                  </strong>
+                </div>
+              )}
             </header>
             {(error || sessionStarted) && (
               <div className="kb-alert" role="alert">

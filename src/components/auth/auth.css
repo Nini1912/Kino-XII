@@ -6,7 +6,7 @@
 .auth-overlay {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  z-index: 3000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -15,7 +15,6 @@
   background: rgba(0, 0, 0, 0.75);
   backdrop-filter: blur(7px);
 }
-
 /* ==============================
    AUTH MODAL
 ============================== */
@@ -227,7 +226,9 @@
 }
 
 .auth-submit:disabled {
-  opacity: 0.6;
+  background: #555766;
+  color: #b6b6c0;
+  opacity: 1;
   cursor: not-allowed;
 }
 
@@ -470,4 +471,69 @@
     margin-top: 22px;
     font-size: 13px;
   }
+}
+
+.auth-input-wrap,
+.auth-password-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.auth-input-wrap input,
+.auth-password-wrap input {
+  padding-right: 45px;
+}
+
+.auth-validation-icon {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.auth-validation-icon.is-valid {
+  color: #35d989;
+}
+
+.auth-validation-icon.is-invalid {
+  color: #ff321e;
+}
+
+.auth-validation-icon.with-toggle {
+  right: 43px;
+}
+
+.auth-password-wrap:has(.auth-password-toggle) input {
+  padding-right: 72px;
+}
+
+.register-modal .auth-field input.invalid {
+  border: 1px solid #ff321e;
+  background: #202233;
+}
+
+.register-modal .auth-field input.valid {
+  border: 1px solid transparent;
+  background: #202233;
+}
+
+.auth-field:has(input.invalid) > label {
+  color: #ff321e;
+}
+
+.register-modal .auth-field-error {
+  color: #ff321e;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+
+.auth-password-toggle {
+  right: 10px;
+  z-index: 2;
 }

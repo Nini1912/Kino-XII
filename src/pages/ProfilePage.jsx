@@ -1,156 +1,36 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { CalendarDays, ChevronDown } from "lucide-react";
 
 import { profileApi } from "../api/profileApi";
+import { ticketsApi } from "../api/ticketsApi";
 import { useAuth } from "../hooks/useAuth";
 import MyTickets from "../components/profile/MyTickets";
+
 import "../styles/profile.css";
 
-const asArray = (value) => {
-  if (Array.isArray(value)) return value;
-  if (Array.isArray(value?.data)) return value.data;
-  return [];
-};
+function countUpcomingTickets(orders) {
+  if (!Array.isArray(orders)) return 0;
 
-function getTicketDate(ticket) {
-  return (
-    ticket?.session?.startsAt ??
-    ticket?.session?.startTime ??
-    ticket?.startsAt ??
-    ticket?.dateTime ??
-    null
-  );
+  return orders.reduce((total, order) => {
+    if (order.status === "refunded") return total;
+
+    const tickets = Array.isArray(order.tickets) ? order.tickets : [];
+
+    return total + tickets.length;
+  }, 0);
 }
 
-function formatSessionDate(value) {
-  if (!value) return "Date unavailable";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value);
-  return date.toLocaleString("en-GB", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function TicketCard({ ticket, onRefund }) {
-  const movie = ticket.movie ?? ticket.session?.movie ?? {};
-  const session = ticket.session ?? {};
-  const venue = session.venue ?? ticket.venue ?? {};
-  const date = getTicketDate(ticket);
-
-  const movieTitle = movie.title ?? ticket.movieTitle ?? "Movie";
-  const poster = movie.posterUrl ?? movie.poster ?? ticket.posterUrl;
-  const orderCode = ticket.orderNumber ?? ticket.orderCode ?? ticket.id;
-  const amount = ticket.totalPaid ?? ticket.totalPrice ?? ticket.total;
-  const seats = asArray(ticket.seats);
-  const isPast = date ? new Date(date).getTime() < Date.now() : false;
-
-  return (
-    <article className="profile-ticket-card">
-      <div className="profile-ticket-main">
-        {poster ? (
-          <img
-            className="profile-ticket-poster"
-            src={poster}
-            alt={movieTitle}
-          />
-        ) : (
-          <div className="profile-ticket-poster profile-ticket-poster-empty">
-            KINO XII
-          </div>
-        )}
-
-        <div className="profile-ticket-content">
-          <div className="profile-ticket-title-line">
-            <h3>{movieTitle}</h3>
-            {movie.ageRating && (
-              <span className="profile-ticket-rating">{movie.ageRating}</span>
-            )}
-            {movie.duration && (
-              <span className="profile-ticket-duration">
-                {movie.duration} min
-              </span>
-            )}
-          </div>
-
-          <div className="profile-ticket-details">
-            <div>
-              <span className="profile-ticket-label">DATE</span>
-              <strong>{formatSessionDate(date)}</strong>
-            </div>
-            <div>
-              <span className="profile-ticket-label">VENUE</span>
-              <strong>
-                {venue.name ?? session.venueName ?? "—"}
-                {session.hall?.name ? ` · ${session.hall.name}` : ""}
-              </strong>
-            </div>
-            <div>
-              <span className="profile-ticket-label">FORMAT</span>
-              <strong>
-                {session.format?.name ?? session.formatName ?? "—"}
-              </strong>
-            </div>
-          </div>
-
-          {seats.length > 0 && (
-            <div className="profile-ticket-seats">
-              <span>SEATS</span>
-              {seats.map((seat, index) => (
-                <span className="profile-seat-pill" key={seat.id ?? index}>
-                  {typeof seat === "string"
-                    ? seat
-                    : (seat.label ?? `${seat.row ?? ""}${seat.number ?? ""}`)}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="profile-ticket-order">
-        <div className="profile-order-number">
-          <span>ORDER</span>
-          <strong>{orderCode ? `#${orderCode}` : "—"}</strong>
-        </div>
-
-        <div className="profile-ticket-total">
-          <span>Total paid</span>
-          <strong>{amount != null ? `₾${amount}` : "—"}</strong>
-        </div>
-
-        <button
-          type="button"
-          className="profile-refund-button"
-          disabled={isPast || !onRefund}
-          onClick={() => onRefund?.(ticket)}
-          title={!onRefund ? "Refund integration is not available yet" : ""}
-        >
-          Refund
-        </button>
-
-        {ticket.refundableUntil && (
-          <small>
-            Refundable until {formatSessionDate(ticket.refundableUntil)}
-          </small>
-        )}
-      </div>
-    </article>
-  );
-}
-
-export default function ProfilePage({ tickets = [], venues = [], onRefund }) {
+export default function ProfilePage({ venues = [] }) {
   const { user, isAuthenticated, isInitializing, openLogin, refreshUser } =
     useAuth();
 
   const [searchParams, setSearchParams] = useSearchParams();
+
   const activeTab =
     searchParams.get("tab") === "tickets" ? "tickets" : "information";
 
-  const [ticketFilter, setTicketFilter] = useState("upcoming");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -162,6 +42,17 @@ export default function ProfilePage({ tickets = [], venues = [], onRefund }) {
     dateOfBirth: "",
     preferredVenueId: "",
   });
+
+  // Fetch upcoming tickets for the red badge.
+  // This uses the same query key as MyTickets.jsx.
+
+  const upcomingTicketsQuery = useQuery({
+    queryKey: ["my-tickets", "upcoming"],
+    queryFn: () => ticketsApi.getTickets("upcoming"),
+    enabled: isAuthenticated && !isInitializing,
+  });
+
+  const upcomingTicketCount = countUpcomingTickets(upcomingTicketsQuery.data);
 
   useEffect(() => {
     if (!user) return;
@@ -180,20 +71,31 @@ export default function ProfilePage({ tickets = [], venues = [], onRefund }) {
 
   function changeTab(tab) {
     setSearchParams(tab === "tickets" ? { tab: "tickets" } : {});
+
     setError("");
     setSuccess("");
   }
 
   function updateField(event) {
     const { name, value } = event.target;
-    setValues((current) => ({ ...current, [name]: value }));
-    setFieldErrors((current) => ({ ...current, [name]: [] }));
+
+    setValues((current) => ({
+      ...current,
+      [name]: value,
+    }));
+
+    setFieldErrors((current) => ({
+      ...current,
+      [name]: [],
+    }));
+
     setError("");
     setSuccess("");
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
+
     if (saving) return;
 
     setSaving(true);
@@ -210,6 +112,7 @@ export default function ProfilePage({ tickets = [], venues = [], onRefund }) {
       });
 
       const updatedUser = await refreshUser();
+
       setSuccess(
         updatedUser.profileComplete
           ? "Changes saved successfully."
@@ -217,6 +120,7 @@ export default function ProfilePage({ tickets = [], venues = [], onRefund }) {
       );
     } catch (requestError) {
       const data = requestError.response?.data;
+
       if (requestError.response?.status === 422 && data?.errors) {
         setFieldErrors(data.errors);
       } else {
@@ -227,20 +131,19 @@ export default function ProfilePage({ tickets = [], venues = [], onRefund }) {
     }
   }
 
-  const allTickets = useMemo(() => asArray(tickets), [tickets]);
+  function renderErrors(field) {
+    const messages = fieldErrors[field];
 
-  const upcomingTickets = allTickets.filter((ticket) => {
-    const date = getTicketDate(ticket);
-    return date && new Date(date).getTime() >= Date.now();
-  });
+    if (!messages) return null;
 
-  const pastTickets = allTickets.filter((ticket) => {
-    const date = getTicketDate(ticket);
-    return date && new Date(date).getTime() < Date.now();
-  });
+    const errorList = Array.isArray(messages) ? messages : [messages];
 
-  const displayedTickets =
-    ticketFilter === "upcoming" ? upcomingTickets : pastTickets;
+    return errorList.map((message, index) => (
+      <span className="profile-field-error" key={`${field}-${index}`}>
+        {message}
+      </span>
+    ));
+  }
 
   if (isInitializing) {
     return (
@@ -255,8 +158,14 @@ export default function ProfilePage({ tickets = [], venues = [], onRefund }) {
       <main className="profile-page">
         <div className="profile-container">
           <h1>My Profile</h1>
+
           <p>Please log in to view your profile.</p>
-          <button className="profile-save-button" onClick={openLogin}>
+
+          <button
+            type="button"
+            className="profile-save-button"
+            onClick={openLogin}
+          >
             Log in
           </button>
         </div>
@@ -264,17 +173,12 @@ export default function ProfilePage({ tickets = [], venues = [], onRefund }) {
     );
   }
 
-  const renderErrors = (field) =>
-    (fieldErrors[field] ?? []).map((message, index) => (
-      <span className="profile-field-error" key={index}>
-        {message}
-      </span>
-    ));
-
   return (
     <main className="profile-page">
       <div className="profile-container">
         <h1 className="profile-page-title">My Profile</h1>
+
+        {/* PROFILE TABS */}
 
         <div
           className="profile-tabs"
@@ -300,18 +204,26 @@ export default function ProfilePage({ tickets = [], venues = [], onRefund }) {
             className={`profile-tab ${activeTab === "tickets" ? "active" : ""}`}
             onClick={() => changeTab("tickets")}
           >
-            My Tickets
-            {allTickets.length > 0 && (
-              <span className="profile-ticket-count">{allTickets.length}</span>
+            <span>My Tickets</span>
+
+            {upcomingTicketsQuery.isSuccess && upcomingTicketCount > 0 && (
+              <span className="profile-ticket-count">
+                {upcomingTicketCount}
+              </span>
             )}
           </button>
         </div>
 
+        {/* PERSONAL INFORMATION */}
+
         {activeTab === "information" ? (
           <section className="profile-info-panel">
             <form className="profile-form" onSubmit={handleSubmit} noValidate>
+              {/* FULL NAME */}
+
               <div className="profile-field">
                 <label htmlFor="profile-fullName">Full Name</label>
+
                 <input
                   id="profile-fullName"
                   name="fullName"
@@ -322,24 +234,32 @@ export default function ProfilePage({ tickets = [], venues = [], onRefund }) {
                   placeholder="Enter full name"
                   disabled={saving}
                 />
+
                 {renderErrors("fullName")}
               </div>
 
+              {/* EMAIL */}
+
               <div className="profile-field">
                 <label htmlFor="profile-email">Email</label>
+
                 <input
                   id="profile-email"
                   type="email"
                   value={user.email ?? ""}
                   readOnly
                 />
+
                 <span className="profile-field-hint">
                   Set at registration and cannot be changed
                 </span>
               </div>
 
+              {/* MOBILE NUMBER */}
+
               <div className="profile-field">
                 <label htmlFor="profile-mobileNumber">Mobile number</label>
+
                 <input
                   id="profile-mobileNumber"
                   name="mobileNumber"
@@ -350,11 +270,15 @@ export default function ProfilePage({ tickets = [], venues = [], onRefund }) {
                   placeholder="599 123 456"
                   disabled={saving}
                 />
+
                 {renderErrors("mobileNumber")}
               </div>
 
+              {/* DATE OF BIRTH */}
+
               <div className="profile-field">
                 <label htmlFor="profile-dateOfBirth">Date of birth</label>
+
                 <div className="profile-date-wrap">
                   <input
                     id="profile-dateOfBirth"
@@ -364,15 +288,20 @@ export default function ProfilePage({ tickets = [], venues = [], onRefund }) {
                     onChange={updateField}
                     disabled={saving}
                   />
+
                   <CalendarDays size={17} aria-hidden="true" />
                 </div>
+
                 {renderErrors("dateOfBirth")}
               </div>
+
+              {/* PREFERRED VENUE */}
 
               <div className="profile-field">
                 <label htmlFor="profile-venue">
                   Preferred Venue <span>(Optional)</span>
                 </label>
+
                 <div className="profile-select-wrap">
                   <select
                     id="profile-venue"
@@ -382,6 +311,7 @@ export default function ProfilePage({ tickets = [], venues = [], onRefund }) {
                     disabled={saving}
                   >
                     <option value="">Select venue</option>
+
                     {user.preferredVenue &&
                       !venues.some(
                         (venue) =>
@@ -391,27 +321,37 @@ export default function ProfilePage({ tickets = [], venues = [], onRefund }) {
                           {user.preferredVenue.name}
                         </option>
                       )}
+
                     {venues.map((venue) => (
                       <option key={venue.id} value={venue.id}>
                         {venue.name}
                       </option>
                     ))}
                   </select>
+
                   <ChevronDown size={17} aria-hidden="true" />
                 </div>
+
                 {renderErrors("preferredVenueId")}
               </div>
+
+              {/* ERROR MESSAGE */}
 
               {error && (
                 <p className="profile-message profile-error" role="alert">
                   {error}
                 </p>
               )}
+
+              {/* SUCCESS MESSAGE */}
+
               {success && (
                 <p className="profile-message profile-success" role="status">
                   {success}
                 </p>
               )}
+
+              {/* SAVE BUTTON */}
 
               <button
                 type="submit"
@@ -423,6 +363,7 @@ export default function ProfilePage({ tickets = [], venues = [], onRefund }) {
             </form>
           </section>
         ) : (
+          /* MY TICKETS */
           <MyTickets />
         )}
       </div>

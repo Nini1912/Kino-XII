@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Upload, Eye, EyeOff, X } from "lucide-react";
 
 import { useAuth } from "../../hooks/useAuth";
 import "./auth.css";
+import { Upload, Eye, EyeOff, X, Check, CircleAlert } from "lucide-react";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -63,7 +63,11 @@ export default function RegisterModal() {
   if (!isRegisterOpen) return null;
 
   const errors = {
-    username: !values.username.trim() ? "Username is required" : "",
+    username: !values.username.trim()
+      ? "Username is required"
+      : values.username.trim().length < 3
+        ? "Username must be at least 3 characters"
+        : "",
     email: !values.email.trim()
       ? "Email is required"
       : !EMAIL_PATTERN.test(values.email.trim())
@@ -71,8 +75,8 @@ export default function RegisterModal() {
         : "",
     password: !values.password
       ? "Password is required"
-      : values.password.length < 8
-        ? "Password must contain at least 8 characters"
+      : values.password.length < 3
+        ? "Password must be at least 3 characters"
         : "",
     password_confirmation: !values.password_confirmation
       ? "Confirm your password"
@@ -132,13 +136,15 @@ export default function RegisterModal() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      setServerError("Please choose an image file.");
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setServerError("Only JPG, PNG, and WebP images are allowed.");
+      event.target.value = "";
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
       setServerError("Avatar must be smaller than 5 MB.");
+      event.target.value = "";
       return;
     }
 
@@ -208,64 +214,84 @@ export default function RegisterModal() {
     }
   }
 
-  function renderField({
-    field,
-    label,
-    type = "text",
-    placeholder,
-    autoComplete,
-    visible,
-    toggleVisibility,
-  }) {
-    const message = getFieldError(field);
+ 
+function renderField({
+  field,
+  label,
+  type = "text",
+  placeholder,
+  autoComplete,
+  visible,
+  toggleVisibility,
+}) {
+  const message = getFieldError(field);
+  const inputType = toggleVisibility ? (visible ? "text" : "password") : type;
 
-    const inputType = toggleVisibility ? (visible ? "text" : "password") : type;
+  const isInvalid = touched[field] && Boolean(message || errors[field]);
+  const isValid = touched[field] && !message && !errors[field];
+  const showIcon = isInvalid || isValid;
 
-    return (
-      <div className="auth-field" key={field}>
-        <label htmlFor={`register-${field}`}>{label}</label>
+  return (
+    <div className="auth-field" key={field}>
+      <label htmlFor={`register-${field}`}>{label}</label>
 
-        <div className={toggleVisibility ? "auth-password-wrap" : undefined}>
-          <input
-            id={`register-${field}`}
-            type={inputType}
-            placeholder={placeholder}
-            autoComplete={autoComplete}
-            value={values[field]}
+      <div
+        className={
+          toggleVisibility
+            ? "auth-input-wrap auth-password-wrap"
+            : "auth-input-wrap"
+        }
+      >
+        <input
+          id={`register-${field}`}
+          type={inputType}
+          placeholder={placeholder}
+          autoComplete={autoComplete}
+          value={values[field]}
+          disabled={isSubmitting}
+          className={isInvalid ? "invalid" : isValid ? "valid" : ""}
+          onChange={(event) => updateField(field, event.target.value)}
+          onBlur={() =>
+            setTouched((current) => ({
+              ...current,
+              [field]: true,
+            }))
+          }
+          aria-invalid={isInvalid}
+        />
+
+        {showIcon && (
+          <span
+            className={`auth-validation-icon ${
+              isInvalid ? "is-invalid" : "is-valid"
+            } ${toggleVisibility ? "with-toggle" : ""}`}
+          >
+            {isInvalid ? (
+              <CircleAlert size={15} />
+            ) : (
+              <Check size={17} strokeWidth={2.5} />
+            )}
+          </span>
+        )}
+
+        {toggleVisibility && (
+          <button
+            type="button"
+            className="auth-password-toggle"
+            onClick={toggleVisibility}
             disabled={isSubmitting}
-            className={
-              message
-                ? "invalid"
-                : touched[field] && !errors[field]
-                  ? "valid"
-                  : ""
-            }
-            onChange={(event) => updateField(field, event.target.value)}
-            onBlur={() =>
-              setTouched((current) => ({
-                ...current,
-                [field]: true,
-              }))
-            }
-            aria-invalid={Boolean(message)}
-          />
-
-          {toggleVisibility && (
-            <button
-              type="button"
-              className="auth-password-toggle"
-              onClick={toggleVisibility}
-              aria-label={visible ? "Hide password" : "Show password"}
-            >
-              {visible ? <EyeOff size={19} /> : <Eye size={19} />}
-            </button>
-          )}
-        </div>
-
-        {message && <span className="auth-field-error">{message}</span>}
+            aria-label={visible ? "Hide password" : "Show password"}
+          >
+            {visible ? <EyeOff size={19} /> : <Eye size={19} />}
+          </button>
+        )}
       </div>
-    );
-  }
+
+      {message && <span className="auth-field-error">{message}</span>}
+    </div>
+  );
+}
+
 
   return (
     <div
@@ -373,7 +399,11 @@ export default function RegisterModal() {
             </p>
           )}
 
-          <button type="submit" className="auth-submit" disabled={isSubmitting}>
+          <button
+            type="submit"
+            className="auth-submit"
+            disabled={isSubmitting || Object.values(errors).some(Boolean)}
+          >
             {isSubmitting ? "Signing up..." : "Sign up"}
           </button>
         </form>

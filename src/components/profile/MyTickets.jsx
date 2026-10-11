@@ -4,6 +4,8 @@ import { ticketsApi } from "../../api/ticketsApi";
 
 const filters = ["upcoming", "past"];
 
+const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+
 function money(value) {
   const amount = Number(value);
   return Number.isFinite(amount) ? `₾${amount.toFixed(2)}` : "—";
@@ -11,8 +13,12 @@ function money(value) {
 
 function formatDate(value) {
   if (!value) return "—";
+
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
 
   return date.toLocaleString("en-GB", {
     day: "numeric",
@@ -23,6 +29,16 @@ function formatDate(value) {
   });
 }
 
+function countTickets(orders) {
+  if (!Array.isArray(orders)) return 0;
+
+  return orders.reduce(
+    (total, order) =>
+      total + (Array.isArray(order.tickets) ? order.tickets.length : 0),
+    0,
+  );
+}
+
 function TicketCard({ order, onRefund, refunding }) {
   const session = order.session ?? {};
   const movie = session.movie ?? {};
@@ -30,8 +46,6 @@ function TicketCard({ order, onRefund, refunding }) {
   const hall = session.hall ?? {};
   const format = session.format ?? {};
   const language = session.language ?? {};
-
-  const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 
   const startsAt = Date.parse(session.startsAt);
 
@@ -104,6 +118,7 @@ function TicketCard({ order, onRefund, refunding }) {
 
           <div className="profile-ticket-seats">
             <span>SEATS</span>
+
             {(order.tickets ?? []).map((ticket) => (
               <span className="profile-seat-pill" key={ticket.id}>
                 {ticket.seatCode}
@@ -158,10 +173,33 @@ export default function MyTickets() {
 
   const queryClient = useQueryClient();
 
-  const ticketsQuery = useQuery({
-    queryKey: ["my-tickets", filter],
-    queryFn: () => ticketsApi.getTickets(filter),
+  // Fetch upcoming and past orders separately.
+  // Both results are cached by TanStack Query.
+
+  const upcomingQuery = useQuery({
+    queryKey: ["my-tickets", "upcoming"],
+    queryFn: () => ticketsApi.getTickets("upcoming"),
   });
+
+  const pastQuery = useQuery({
+    queryKey: ["my-tickets", "past"],
+    queryFn: () => ticketsApi.getTickets("past"),
+  });
+
+  const upcomingOrders = Array.isArray(upcomingQuery.data)
+    ? upcomingQuery.data
+    : [];
+
+  const pastOrders = Array.isArray(pastQuery.data) ? pastQuery.data : [];
+
+  // Count individual tickets (seats), not orders.
+  const upcomingCount = countTickets(upcomingOrders);
+  const pastCount = countTickets(pastOrders);
+
+  // Select the currently active query and its orders.
+  const ticketsQuery = filter === "upcoming" ? upcomingQuery : pastQuery;
+
+  const orders = filter === "upcoming" ? upcomingOrders : pastOrders;
 
   const refundMutation = useMutation({
     mutationFn: (reference) => ticketsApi.refundOrder(reference),
@@ -170,6 +208,8 @@ export default function MyTickets() {
       setRefundError("");
       setRefundTarget(null);
 
+      // Refresh both upcoming and past counts
+      // after a successful refund.
       await queryClient.invalidateQueries({
         queryKey: ["my-tickets"],
       });
@@ -177,6 +217,7 @@ export default function MyTickets() {
 
     onError: (error) => {
       const data = error.response?.data;
+
       const validationMessage = data?.errors
         ? Object.values(data.errors).flat()[0]
         : null;
@@ -187,42 +228,61 @@ export default function MyTickets() {
     },
   });
 
-  const orders = Array.isArray(ticketsQuery.data) ? ticketsQuery.data : [];
-
   async function confirmRefund() {
-    if (!refundTarget || refundMutation.isPending) return;
+    if (!refundTarget || refundMutation.isPending) {
+      return;
+    }
+
     await refundMutation.mutateAsync(refundTarget.reference).catch(() => {});
   }
 
   return (
     <section className="profile-tickets-panel">
+      {/* UPCOMING / PAST FILTERS */}
+
       <div className="profile-ticket-filters">
-        {filters.map((item) => (
-          <button
-            key={item}
-            type="button"
-            className={filter === item ? "active" : ""}
-            onClick={() => {
-              setFilter(item);
-              setRefundError("");
-            }}
-          >
-            {item === "upcoming" ? "Upcoming" : "Past"}
-          </button>
-        ))}
+        {filters.map((item) => {
+          const count = item === "upcoming" ? upcomingCount : pastCount;
+
+          const countQuery = item === "upcoming" ? upcomingQuery : pastQuery;
+
+          return (
+            <button
+              key={item}
+              type="button"
+              className={filter === item ? "active" : ""}
+              aria-pressed={filter === item}
+              onClick={() => {
+                setFilter(item);
+                setRefundError("");
+              }}
+            >
+              {item === "upcoming" ? "Upcoming" : "Past"}
+
+              {!countQuery.isPending && !countQuery.isError && (
+                <span>{count}</span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
-      {refundError && (
+      {/* REFUND ERROR */}
+
+      {refundError && !refundTarget && (
         <p className="profile-message profile-error" role="alert">
           {refundError}
         </p>
       )}
+
+      {/* TICKET LIST */}
 
       {ticketsQuery.isPending ? (
         <div className="profile-tickets-empty">Loading tickets...</div>
       ) : ticketsQuery.isError ? (
         <div className="profile-tickets-empty">
           <p>Unable to load your tickets.</p>
+
           <button type="button" onClick={() => ticketsQuery.refetch()}>
             Retry
           </button>
@@ -235,7 +295,10 @@ export default function MyTickets() {
             <TicketCard
               key={order.id}
               order={order}
-              onRefund={setRefundTarget}
+              onRefund={(selectedOrder) => {
+                setRefundError("");
+                setRefundTarget(selectedOrder);
+              }}
               refunding={
                 refundMutation.isPending && refundTarget?.id === order.id
               }
@@ -243,6 +306,8 @@ export default function MyTickets() {
           ))}
         </div>
       )}
+
+      {/* REFUND CONFIRMATION MODAL */}
 
       {refundTarget && (
         <div

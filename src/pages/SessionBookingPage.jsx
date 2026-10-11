@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
 import { bookingApi } from "../api/bookingApi";
@@ -9,6 +9,7 @@ import "../styles/booking.css";
 export default function SessionBookingPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const {
     data: session,
@@ -33,15 +34,15 @@ export default function SessionBookingPage() {
   });
 
   function handleClose() {
-    // Prefer the movie details page when possible.
-    // This also works for directly opened booking links.
-    const movieId = session?.movie?.id ?? session?.movie?.slug;
-
-    if (movieId) {
-      navigate(`/movies/${movieId}`, { replace: true });
-    } else {
-      navigate("/sessions", { replace: true });
-    }
+    const from = location.state?.from;
+    const safeFrom =
+      typeof from === "string" &&
+      from.startsWith("/") &&
+      !from.startsWith("//") &&
+      !from.startsWith("/sessions/")
+        ? from
+        : "/sessions";
+    navigate(safeFrom, { replace: true });
   }
 
   if (isPending) {

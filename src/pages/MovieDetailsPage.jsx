@@ -1,25 +1,37 @@
 import { useEffect, useMemo, useState } from "react";
+
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+
 import { Clock3 } from "lucide-react";
+
 import { moviesApi } from "../api/moviesApi";
+
 import { useAuth } from "../hooks/useAuth";
+
 import { useRecentlyViewed } from "../hooks/useRecentlyViewed";
+
 import "../styles/movieDetails.css";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 function getNextSevenDays() {
   const today = new Date();
+
   const days = [];
 
   for (let offset = 0; offset < 7; offset++) {
     const day = new Date(
       today.getFullYear(),
+
       today.getMonth(),
+
       today.getDate() + offset,
     );
 
     const year = day.getFullYear();
+
     const month = String(day.getMonth() + 1).padStart(2, "0");
+
     const date = String(day.getDate()).padStart(2, "0");
 
     days.push(`${year}-${month}-${date}`);
@@ -29,44 +41,67 @@ function getNextSevenDays() {
 }
 
 const unwrap = (response) => response?.data ?? response;
+
 const prettyDate = (value) =>
   new Intl.DateTimeFormat("en-GB", {
     weekday: "short",
+
     day: "numeric",
+
     timeZone: "UTC",
   }).format(new Date(`${value}T12:00:00Z`));
+
 const longDate = (value) =>
   value
     ? new Intl.DateTimeFormat("en-GB", {
         day: "numeric",
+
         month: "long",
+
         year: "numeric",
+
         timeZone: "UTC",
       }).format(new Date(`${value}T12:00:00Z`))
     : "—";
 
 export default function MovieDetailsPage() {
   const calendarDays = useMemo(() => getNextSevenDays(), []);
+
   const { id } = useParams();
+
   const location = useLocation();
+
   const navigate = useNavigate();
+
   const { isAuthenticated, user, requireLogin } = useAuth();
+
   const queryClient = useQueryClient();
+
   const { addRecentlyViewed } = useRecentlyViewed();
+
   const [selectedDate, setSelectedDate] = useState("");
+
   const movieQuery = useQuery({
     queryKey: ["movie", id],
+
     queryFn: () => moviesApi.getMovie(id),
+
     enabled: !!id,
   });
+
   const movie = unwrap(movieQuery.data);
+
   const availableDates = movie?.availableDates ?? [];
+
   const date = availableDates.includes(selectedDate)
     ? selectedDate
     : (calendarDays.find((day) => availableDates.includes(day)) ?? "");
+
   const sessionsQuery = useQuery({
     queryKey: ["movie", id, "sessions", date],
+
     queryFn: () => moviesApi.getMovieSessions(id, date),
+
     enabled: !!id && !!date && !movie?.isComingSoon,
   });
 
@@ -77,8 +112,10 @@ export default function MovieDetailsPage() {
       await Promise.all([
         queryClient.invalidateQueries({
           queryKey: ["movie", id],
+
           exact: true,
         }),
+
         queryClient.invalidateQueries({
           queryKey: ["coming-soon"],
         }),
@@ -91,69 +128,85 @@ export default function MovieDetailsPage() {
       return;
     }
 
-    const movieId = movie?.id ?? id;
+    const movieSlug = movie?.slug;
 
-    if (!movieId) return;
+    if (!movieSlug) return;
 
     if (!isAuthenticated) {
       requireLogin(() => {
-        return notifyMutation.mutateAsync(movieId);
+        return notifyMutation.mutateAsync(movieSlug);
       });
+
       return;
     }
 
-    notifyMutation.mutate(movieId);
+    notifyMutation.mutate(movieSlug);
   }
+
   const venueGroups = useMemo(() => {
     const result = unwrap(sessionsQuery.data);
+
     return Array.isArray(result) ? result : [];
   }, [sessionsQuery.data]);
 
   useEffect(() => {
     if (isAuthenticated && movie?.id) addRecentlyViewed(movie);
   }, [isAuthenticated, movie?.id, addRecentlyViewed]);
+
   useEffect(() => {
     if (location.hash !== "#movie-sessions" || movieQuery.isPending) return;
+
     const frame = requestAnimationFrame(() =>
       document
+
         .getElementById("movie-sessions")
+
         ?.scrollIntoView({ behavior: "smooth", block: "start" }),
     );
+
     return () => cancelAnimationFrame(frame);
   }, [location.hash, movieQuery.isPending]);
 
   if (movieQuery.isPending)
     return <main className="md-status-page">Loading movie...</main>;
+
   if (movieQuery.isError || !movie)
     return (
       <main className="md-status-page">
         <h1>Movie unavailable</h1>
+
         <p>
           {movieQuery.error?.response?.data?.message ??
             "We couldn't load this movie."}
         </p>
+
         <Link to="/">Back to movies</Link>
       </main>
     );
 
   const poster = movie.posterUrl ?? movie.poster_url ?? movie.poster;
+
   const backdrop =
     movie.backdropUrl ?? movie.backdrop_url ?? movie.backdrop ?? poster;
+
   const age = movie.ageRating ?? movie.age_rating;
+
   const ageCode = typeof age === "object" ? age?.code : age;
+
   const ageRestricted =
     isAuthenticated &&
     user?.age != null &&
     age?.minAge != null &&
     Number(user.age) < Number(age.minAge);
-  const genres = (movie.genres ?? [])
-    .map((item) => (typeof item === "string" ? item : item.name))
-    .filter(Boolean)
-    .join(", ");
+
   const formats = (movie.formats ?? [])
+
     .map((item) => (typeof item === "string" ? item : item.name))
+
     .filter(Boolean)
+
     .join(", ");
+
   const isUpcoming = movie.isComingSoon || !availableDates.length;
 
   return (
@@ -170,23 +223,29 @@ export default function MovieDetailsPage() {
           <div className="md-poster">
             {poster && <img src={poster} alt={movie.title} />}
           </div>
+
           <div className="md-hero-copy">
             <span className="md-eyebrow">
               {movie.isComingSoon ? "COMING SOON" : "NOW PLAYING"}
             </span>
+
             <h1>{movie.title}</h1>
+
             <p>{movie.synopsis ?? movie.description}</p>
+
             <div className="md-chips">
               {ageCode && (
                 <span className="md-age" title={age?.description ?? ""}>
                   {ageCode}
                 </span>
               )}
+
               {movie.runtimeMinutes && (
                 <span>
                   <Clock3 size={14} /> {movie.runtimeMinutes} Min
                 </span>
               )}
+
               {(movie.formats ?? []).map((f) => (
                 <span key={f.id ?? f.slug ?? f}>
                   {typeof f === "string" ? f : f.name}
@@ -196,9 +255,11 @@ export default function MovieDetailsPage() {
           </div>
         </div>
       </section>
+
       <div className="md-container md-main">
         <section id="movie-sessions" className="md-sessions">
           <h2>Sessions</h2>
+
           {availableDates.length > 0 && (
             <div className="md-dates" aria-label="Choose session date">
               {calendarDays.map((day) => {
@@ -219,17 +280,20 @@ export default function MovieDetailsPage() {
                     }
                   >
                     <span>{prettyDate(day).split(" ")[0]}</span>
+
                     <strong>{day.slice(-2)}</strong>
                   </button>
                 );
               })}
             </div>
           )}
+
           {ageRestricted && (
             <p className="md-warning">
               You must be at least {age.minAge} to book this film.
             </p>
           )}
+
           {isUpcoming ? (
             <div className="md-coming-soon">
               <p className="md-muted">
@@ -281,16 +345,20 @@ export default function MovieDetailsPage() {
             venueGroups.map((group, gi) => (
               <div className="md-venue" key={group.venue?.id ?? gi}>
                 <h3>{group.venue?.name ?? "Cinema"}</h3>
+
                 <div className="md-halls">
                   {Object.entries(
                     (group.sessions ?? []).reduce((acc, session) => {
                       const key = session.hall?.name ?? "Hall";
+
                       (acc[key] ??= []).push(session);
+
                       return acc;
                     }, {}),
                   ).map(([hall, sessions]) => (
                     <div className="md-hall" key={hall}>
                       <h4>Hall {hall}</h4>
+
                       <div className="md-showtimes">
                         {sessions.map((session) => {
                           const disabled =
@@ -299,6 +367,7 @@ export default function MovieDetailsPage() {
                             ageRestricted ||
                             (session.startsAt &&
                               Date.parse(session.startsAt) <= Date.now());
+
                           return (
                             <button
                               key={session.id}
@@ -306,7 +375,11 @@ export default function MovieDetailsPage() {
                               disabled={disabled}
                               className="md-showtime"
                               onClick={() =>
-                                navigate(`/sessions/${session.id}`)
+                                navigate(`/sessions/${session.id}`, {
+                                  state: {
+                                    from: `${location.pathname}${location.search}${location.hash}`,
+                                  },
+                                })
                               }
                               title={
                                 disabled
@@ -314,16 +387,23 @@ export default function MovieDetailsPage() {
                                   : `Book ${session.time}`
                               }
                             >
-                              <span className="md-showtime-top">
-                                <strong>{session.time ?? "—"}</strong>
-                                <b>₾ {session.price}</b>
-                              </span>
-                              <span className="md-showtime-bottom">
-                                <span>{session.language?.code ?? "—"}</span>
-                                <span>
-                                  {session.format?.name ?? "Standard"}
+                              <span className="md-ticket-left">
+                                <strong className="md-ticket-time">
+                                  {session.time ?? "—"}
+                                </strong>
+                                <span className="md-ticket-meta">
+                                  <span>{session.language?.code ?? "—"}</span>
+                                  <span className="md-ticket-format">
+                                    {session.format?.name ?? "Standard"}
+                                  </span>
                                 </span>
-                                <span>
+                              </span>
+                              <span className="md-ticket-right">
+                                <strong className="md-ticket-price">
+                                  ₾ {session.price}
+                                </strong>
+                                <span className="md-ticket-seats">
+                                  <span aria-hidden="true">✦</span>{" "}
                                   {session.isSoldOut
                                     ? "Sold out"
                                     : `${session.seatsLeft} left`}
@@ -340,28 +420,47 @@ export default function MovieDetailsPage() {
             ))
           )}
         </section>
+
         <aside className="md-details">
           <h2>Details</h2>
+
           <dl>
             <dt>DIRECTOR</dt>
+
             <dd>{movie.director ?? "—"}</dd>
+
             <dt>MAIN CAST</dt>
+
             <dd>{movie.cast ?? "—"}</dd>
+
             <dt>DURATION</dt>
+
             <dd>
               {movie.runtimeMinutes ? `${movie.runtimeMinutes} minutes` : "—"}
             </dd>
+
             <dt>RELEASE DATE</dt>
+
             <dd>{longDate(movie.releaseDate)}</dd>
+
             <dt>FORMATS</dt>
+
             <dd>{formats || "—"}</dd>
+
             <dt>FROM</dt>
+
             <dd>{movie.fromPrice != null ? `₾${movie.fromPrice}` : "—"}</dd>
           </dl>
-          {age?.description && (
+
+          {(String(ageCode).replace(/\s/g, "") === "16+" ||
+            age?.description) && (
             <div className="md-rating-note">
               <strong>RATING NOTE</strong>
-              <p>{age.description}</p>
+              <p>
+                {String(ageCode).replace(/\s/g, "") === "16+"
+                  ? "16+ · Not recommended for under-16s. Tickets require an account aged 16 or over."
+                  : age.description}
+              </p>
             </div>
           )}
         </aside>

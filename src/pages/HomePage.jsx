@@ -92,7 +92,7 @@ export default function HomePage() {
 
       {/* Recently Viewed - Logged-in users only */}
       {isAuthenticated && recent.length > 0 && (
-        <MovieSection title="Recently viewed" movies={recent} />
+        <MovieSection title="Recently viewed" movies={recent} recentlyViewed />
       )}
 
       {/* Now Playing */}

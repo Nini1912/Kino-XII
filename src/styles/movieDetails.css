@@ -291,3 +291,116 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* Append to the end of your existing movieDetails.css */
+.md-hall {
+  padding: 10px;
+  background: #202437;
+  border-radius: 14px;
+  min-width: 0;
+}
+.md-halls {
+  gap: 8px;
+}
+.md-showtimes {
+  gap: 7px;
+}
+.md-showtime {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  width: 152px;
+  min-width: 152px;
+  min-height: 61px;
+  padding: 0;
+  background: #090e1e;
+  border: 0;
+  border-radius: 10px;
+  color: #fff;
+  overflow: visible;
+  cursor: pointer;
+}
+.md-ticket-left,
+.md-ticket-right {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 9px 6px;
+}
+.md-ticket-left {
+  flex: 1;
+}
+.md-ticket-right {
+  width: 61px;
+  flex-shrink: 0;
+  border-left: 2px dotted #a3a7ba;
+}
+.md-ticket-right::before,
+.md-ticket-right::after {
+  content: "";
+  position: absolute;
+  left: calc(100% - 61px - 5px);
+  width: 10px;
+  height: 5px;
+  background: #202437;
+}
+.md-ticket-right::before {
+  top: -1px;
+  border-radius: 0 0 10px 10px;
+}
+.md-ticket-right::after {
+  bottom: -1px;
+  border-radius: 10px 10px 0 0;
+}
+.md-ticket-time {
+  font-size: 15px;
+  line-height: 1;
+}
+.md-ticket-price {
+  color: #ff402a;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.md-ticket-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #a5a8b8;
+  font-size: 9px;
+}
+.md-ticket-format {
+  background: #292d3e;
+  color: #d1d3df;
+  border-radius: 12px;
+  padding: 3px 6px;
+  font-size: 9px;
+}
+.md-ticket-seats {
+  color: #a5a8b8;
+  font-size: 9px;
+  white-space: nowrap;
+}
+.md-showtime:hover:not(:disabled) {
+  outline: 1px solid #ff402a;
+}
+.md-showtime:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+.md-rating-note {
+  background: #241d1b;
+  color: #ffae43;
+  border-radius: 9px;
+  padding: 12px;
+  font-size: 11px;
+}
+.md-rating-note strong {
+  color: #ff8a00;
+}
+.md-rating-note p {
+  margin: 5px 0 0;
+}

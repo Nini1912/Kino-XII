@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Zap } from "lucide-react";
 import { sessionsApi } from "../api/sessionsApi";
@@ -144,6 +144,7 @@ function CheckboxGroup({
 
 export default function SessionsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const date = searchParams.get("date") || localDateString(new Date());
@@ -290,7 +291,9 @@ export default function SessionsPage() {
   }
 
   function selectSession(id) {
-    navigate(`/sessions/${id}`);
+    navigate(`/sessions/${id}`, {
+      state: { from: `${location.pathname}${location.search}${location.hash}` },
+    });
   }
 
   const lastPage = Number(meta.lastPage) || 1;

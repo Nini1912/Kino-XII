@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import {
+  Check,
   ChevronDown,
   LogOut,
   Menu,
@@ -70,6 +71,35 @@ export default function Navbar() {
 
   const displayName = user?.username || "My account";
 
+  function ProfileAvatar({ dropdown = false }) {
+    const avatarClass = dropdown
+      ? "navbar-dropdown-avatar"
+      : "navbar-account-avatar";
+
+    return (
+      <span className="navbar-profile-avatar-wrapper">
+        {user?.avatar ? (
+          <img src={user.avatar} alt="" className={avatarClass} />
+        ) : (
+          <span className={`${avatarClass} navbar-account-fallback`}>
+            {displayName.charAt(0).toUpperCase()}
+          </span>
+        )}
+
+        {dropdown && (
+          <span
+            className={`navbar-avatar-status-dot ${
+              isProfileComplete ? "complete" : "incomplete"
+            }`}
+            aria-label={
+              isProfileComplete ? "Profile complete" : "Profile incomplete"
+            }
+          />
+        )}
+      </span>
+    );
+  }
+
   return (
     <>
       <header className="navbar">
@@ -111,17 +141,7 @@ export default function Navbar() {
                       aria-expanded={dropdownOpen}
                       onClick={() => setDropdownOpen((previous) => !previous)}
                     >
-                      {user?.avatar ? (
-                        <img
-                          src={user.avatar}
-                          alt=""
-                          className="navbar-account-avatar"
-                        />
-                      ) : (
-                        <span className="navbar-account-avatar navbar-account-fallback">
-                          {displayName.charAt(0).toUpperCase()}
-                        </span>
-                      )}
+                      <ProfileAvatar />
 
                       <span className="navbar-account-name">{displayName}</span>
 
@@ -134,17 +154,7 @@ export default function Navbar() {
                     {dropdownOpen && (
                       <div className="navbar-account-dropdown" role="menu">
                         <div className="navbar-dropdown-user">
-                          {user?.avatar ? (
-                            <img
-                              src={user.avatar}
-                              alt=""
-                              className="navbar-dropdown-avatar"
-                            />
-                          ) : (
-                            <span className="navbar-dropdown-avatar navbar-account-fallback">
-                              {displayName.charAt(0).toUpperCase()}
-                            </span>
-                          )}
+                          <ProfileAvatar dropdown />
 
                           <div>
                             <strong>{displayName}</strong>
@@ -154,8 +164,8 @@ export default function Navbar() {
 
                         {isProfileComplete ? (
                           <div className="navbar-profile-status navbar-status-complete">
-                            <span className="navbar-status-dot" />
-                            Profile completed
+                            <span>Profile Complete</span>
+                            <Check size={17} strokeWidth={2.5} />
                           </div>
                         ) : (
                           <Link
@@ -164,10 +174,9 @@ export default function Navbar() {
                             onClick={closeMenus}
                             role="menuitem"
                           >
-                            <strong>Complete your profile</strong>
+                            <strong>Profile incomplete</strong>
                             <small>
-                              Add your details to finish setting up your
-                              account.
+                              Please complete your profile to enable booking
                             </small>
                           </Link>
                         )}
@@ -242,6 +251,7 @@ export default function Navbar() {
           </div>
         </div>
       </header>
+
       <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
     </>
   );
