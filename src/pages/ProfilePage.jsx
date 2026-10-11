@@ -22,6 +22,40 @@ function countUpcomingTickets(orders) {
   }, 0);
 }
 
+function validateProfileField(name, value) {
+  if (name === "fullName") {
+    const text = value.trim();
+    if (!text) return "Name is required";
+    if (text.length < 3) return "Name must be at least 3 characters";
+    if (text.length > 50) return "Name must not exceed 50 characters";
+  }
+  if (name === "mobileNumber") {
+    if (!value) return "Mobile number is required";
+    if (!value.startsWith("5"))
+      return "Georgian mobile numbers must start with 5";
+    if (/^\d+$/.test(value) && value.length !== 9)
+      return "Mobile number must be exactly 9 digits";
+    if (!/^5\d{8}$/.test(value))
+      return "Please enter a valid Georgian mobile number (9 digits starting with 5)";
+  }
+  if (name === "dateOfBirth") {
+    if (!value) return "Date of birth is required";
+    const dob = new Date(`${value}T00:00:00`);
+    const today = new Date();
+    if (Number.isNaN(dob.getTime()) || dob > today)
+      return "Please enter a valid date of birth";
+    let age = today.getFullYear() - dob.getFullYear();
+    if (
+      today.getMonth() < dob.getMonth() ||
+      (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate())
+    )
+      age--;
+    if (age < 12)
+      return "You must be at least 12 years old to create an account";
+  }
+  return "";
+}
+
 export default function ProfilePage({ venues = [] }) {
   const { user, isAuthenticated, isInitializing, openLogin, refreshUser } =
     useAuth();
@@ -93,11 +127,29 @@ export default function ProfilePage({ venues = [] }) {
     setSuccess("");
   }
 
+  function handleBlur(event) {
+    const { name, value } = event.target;
+    const message = validateProfileField(name, value);
+    setFieldErrors((previous) => ({
+      ...previous,
+      [name]: message ? [message] : [],
+    }));
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
 
     if (saving) return;
 
+    const errors = {};
+    for (const name of ["fullName", "mobileNumber", "dateOfBirth"]) {
+      const message = validateProfileField(name, values[name]);
+      if (message) errors[name] = [message];
+    }
+    if (Object.keys(errors).length) {
+      setFieldErrors(errors);
+      return;
+    }
     setSaving(true);
     setError("");
     setSuccess("");
@@ -227,6 +279,7 @@ export default function ProfilePage({ venues = [] }) {
                 <input
                   id="profile-fullName"
                   name="fullName"
+                  onBlur={handleBlur}
                   type="text"
                   autoComplete="name"
                   value={values.fullName}
@@ -263,6 +316,7 @@ export default function ProfilePage({ venues = [] }) {
                 <input
                   id="profile-mobileNumber"
                   name="mobileNumber"
+                  onBlur={handleBlur}
                   type="tel"
                   autoComplete="tel"
                   value={values.mobileNumber}
@@ -283,6 +337,7 @@ export default function ProfilePage({ venues = [] }) {
                   <input
                     id="profile-dateOfBirth"
                     name="dateOfBirth"
+                    onBlur={handleBlur}
                     type="date"
                     value={values.dateOfBirth}
                     onChange={updateField}

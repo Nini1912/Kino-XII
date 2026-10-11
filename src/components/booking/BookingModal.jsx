@@ -17,6 +17,49 @@ function isHoldExpired(hold) {
   const expiresAt = Date.parse(hold.expiresAt);
   return !Number.isFinite(expiresAt) || expiresAt <= Date.now();
 }
+function validateCheckoutField(name, value) {
+  const text = String(value ?? "").trim();
+  if (name === "fullName")
+    return !text
+      ? "Name is required"
+      : text.length < 3
+        ? "Name must be at least 3 characters"
+        : text.length > 50
+          ? "Name must not exceed 50 characters"
+          : "";
+  if (name === "email")
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)
+      ? ""
+      : "Please enter a valid email address";
+  if (name === "mobileNumber") {
+    if (!text) return "Mobile number is required";
+    if (!text.startsWith("5"))
+      return "Georgian mobile numbers must start with 5";
+    if (/^\d+$/.test(text) && text.length !== 9)
+      return "Mobile number must be exactly 9 digits";
+    return /^5\d{8}$/.test(text)
+      ? ""
+      : "Please enter a valid Georgian mobile number (9 digits starting with 5)";
+  }
+  if (name === "cardNumber")
+    return /^\d{16}$/.test(text.replace(/\s/g, ""))
+      ? ""
+      : "Card number must contain 16 digits";
+  if (name === "cvv")
+    return /^\d{3}$/.test(text) ? "" : "CVV must contain 3 digits";
+  if (name === "expiry") {
+    const match = /^(0[1-9]|1[0-2])\/(\d{2})$/.exec(text);
+    if (!match) return "Expiry must be in MM/YY format";
+    const year = 2000 + Number(match[2]);
+    const month = Number(match[1]);
+    const now = new Date();
+    return year > now.getFullYear() ||
+      (year === now.getFullYear() && month >= now.getMonth() + 1)
+      ? ""
+      : "Card expiry must be in the future";
+  }
+  return "";
+}
 const emptyForm = {
   fullName: "",
   email: "",
@@ -129,11 +172,17 @@ function SeatGrid({ sections, selected, onToggle, disabled = false }) {
     </div>
   );
 }
-function Field({ label, name, value, onChange, error, ...props }) {
+function Field({ label, name, value, onChange, onBlur, error, ...props }) {
   return (
     <label className="kb-field">
       <span>{label}</span>
-      <input name={name} value={value} onChange={onChange} {...props} />
+      <input
+        name={name}
+        value={value}
+        onChange={onChange}
+        onBlur={onBlur}
+        {...props}
+      />
       {error && (
         <small className="kb-field-error">
           {Array.isArray(error) ? error.join(" ") : error}
@@ -216,7 +265,7 @@ export default function BookingModal({ sessionId, onClose }) {
     () => getTicketTypes(optionsQuery.data, session?.movie),
     [optionsQuery.data, session?.movie],
   );
-  const maxSeats = getMaxSeats(optionsQuery.data);
+  const maxSeats = Math.min(3, getMaxSeats(optionsQuery.data));
   const validTypes =
     types.length > 0 && types.some((type) => type.slug === "adult");
   const basePrice = Number(session?.price ?? 0);
@@ -397,6 +446,10 @@ export default function BookingModal({ sessionId, onClose }) {
       );
       return;
     }
+    if (validSelected.length >= maxSeats) {
+      setError(`You can select a maximum of ${maxSeats} seats per order.`);
+      return;
+    }
     setError("");
     setSelected((previous) => {
       const alreadySelected = previous.some((item) => item.id === seat.id);
@@ -571,11 +624,28 @@ export default function BookingModal({ sessionId, onClose }) {
     setForm((prev) => ({ ...prev, [name]: value }));
     setFieldErrors((prev) => ({ ...prev, [name]: undefined }));
   }
+  function blurCheckoutField(event) {
+    const { name, value } = event.target;
+    const message = validateCheckoutField(name, value);
+    setFieldErrors((previous) => ({
+      ...previous,
+      [name]: message || undefined,
+    }));
+  }
   async function pay(event) {
     event.preventDefault();
     if (!hold || requestLockRef.current) return;
     if (isHoldExpired(hold)) {
       await resetExpired();
+      return;
+    }
+    const validationErrors = {};
+    for (const [name, value] of Object.entries(form)) {
+      const message = validateCheckoutField(name, value);
+      if (message) validationErrors[name] = message;
+    }
+    if (Object.keys(validationErrors).length) {
+      setFieldErrors(validationErrors);
       return;
     }
     requestLockRef.current = true;
@@ -818,6 +888,7 @@ export default function BookingModal({ sessionId, onClose }) {
                         name="fullName"
                         value={form.fullName}
                         onChange={changeForm}
+                        onBlur={blurCheckoutField}
                         error={fieldErrors.fullName}
                         required
                         autoComplete="name"
@@ -828,6 +899,7 @@ export default function BookingModal({ sessionId, onClose }) {
                           name="email"
                           value={form.email}
                           onChange={changeForm}
+                          onBlur={blurCheckoutField}
                           error={fieldErrors.email}
                           type="email"
                           required
@@ -838,6 +910,7 @@ export default function BookingModal({ sessionId, onClose }) {
                           name="mobileNumber"
                           value={form.mobileNumber}
                           onChange={changeForm}
+                          onBlur={blurCheckoutField}
                           error={fieldErrors.mobileNumber}
                           required
                           autoComplete="tel"
@@ -849,6 +922,7 @@ export default function BookingModal({ sessionId, onClose }) {
                         name="cardNumber"
                         value={form.cardNumber}
                         onChange={changeForm}
+                        onBlur={blurCheckoutField}
                         error={fieldErrors.cardNumber}
                         placeholder="e.g. 4242 4242 4242 4242"
                         inputMode="numeric"
@@ -861,6 +935,7 @@ export default function BookingModal({ sessionId, onClose }) {
                           name="expiry"
                           value={form.expiry}
                           onChange={changeForm}
+                          onBlur={blurCheckoutField}
                           error={fieldErrors.expiry}
                           placeholder="MM/YY"
                           required
@@ -871,6 +946,7 @@ export default function BookingModal({ sessionId, onClose }) {
                           name="cvv"
                           value={form.cvv}
                           onChange={changeForm}
+                          onBlur={blurCheckoutField}
                           error={fieldErrors.cvv}
                           type="password"
                           inputMode="numeric"

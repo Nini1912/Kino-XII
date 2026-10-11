@@ -6,7 +6,6 @@ import HeroCarousel from "../components/movies/HeroCarousel";
 import MovieSection from "../components/movies/MovieSection";
 
 import { useRecentlyViewed } from "../hooks/useRecentlyViewed";
-import { useAuth } from "../hooks/useAuth";
 
 import "../styles/home.css";
 
@@ -22,7 +21,6 @@ function normalizeMovies(response) {
 }
 
 export default function HomePage() {
-  const { isAuthenticated } = useAuth();
   const { recent } = useRecentlyViewed();
 
   const featured = useQuery({
@@ -91,7 +89,7 @@ export default function HomePage() {
       <HeroCarousel movies={featuredMovies} />
 
       {/* Recently Viewed - Logged-in users only */}
-      {isAuthenticated && recent.length > 0 && (
+      {recent.length > 0 && (
         <MovieSection title="Recently viewed" movies={recent} recentlyViewed />
       )}
 

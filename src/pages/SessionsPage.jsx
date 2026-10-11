@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Zap } from "lucide-react";
 import { sessionsApi } from "../api/sessionsApi";
+import { useAuth } from "../hooks/useAuth";
 import "../styles/sessions.css";
 
 const FILTER_KEYS = ["venues", "formats", "languages", "bands"];
@@ -30,7 +31,7 @@ function getValues(searchParams, key) {
   return searchParams.getAll(`${key}[]`);
 }
 
-function SessionCard({ session, onSelect }) {
+function SessionCard({ session, onSelect, restriction }) {
   const soldOut = session.isSoldOut;
   const seats = Number(session.seatsLeft ?? 0);
   const lowSeats = seats > 0 && seats <= 5;
@@ -39,7 +40,8 @@ function SessionCard({ session, onSelect }) {
     <button
       type="button"
       className={`sessions-showtime-card ${soldOut ? "is-sold-out" : ""}`}
-      disabled={soldOut}
+      title={restriction || undefined}
+      disabled={soldOut || Boolean(restriction)}
       onClick={() => onSelect(session.id)}
     >
       <div className="sessions-showtime-top">
@@ -71,7 +73,29 @@ function SessionCard({ session, onSelect }) {
   );
 }
 
-function MovieSessionsRow({ group, onSelect }) {
+function MovieSessionsRow({ group, onSelect, user, isAuthenticated }) {
+  const rating = group.movie?.ageRating ?? group.movie?.age_rating;
+  const minAge = Number(
+    rating?.minAge ??
+      String(rating?.code ?? rating ?? "").match(/^(16|18)\+/)?.[1] ??
+      0,
+  );
+  const birthDate = user?.dateOfBirth ? new Date(user.dateOfBirth) : null;
+  const now = new Date();
+  const age =
+    birthDate && !Number.isNaN(birthDate.getTime())
+      ? now.getFullYear() -
+        birthDate.getFullYear() -
+        (now.getMonth() < birthDate.getMonth() ||
+        (now.getMonth() === birthDate.getMonth() &&
+          now.getDate() < birthDate.getDate())
+          ? 1
+          : 0)
+      : null;
+  const restriction =
+    isAuthenticated && minAge >= 16 && age !== null && age < minAge
+      ? `This film is rated ${minAge}+. You cannot buy tickets for it with this account.`
+      : "";
   const { movie, sessions } = group;
 
   return (
@@ -96,11 +120,17 @@ function MovieSessionsRow({ group, onSelect }) {
 
       <div className="sessions-showtimes-scroll">
         <div className="sessions-showtimes">
+          {restriction && (
+            <p role="alert" className="sessions-age-warning">
+              {restriction}
+            </p>
+          )}
           {(sessions ?? []).map((session) => (
             <SessionCard
               key={session.id}
               session={session}
               onSelect={onSelect}
+              restriction={restriction}
             />
           ))}
         </div>
@@ -143,6 +173,7 @@ function CheckboxGroup({
 }
 
 export default function SessionsPage() {
+  const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -432,6 +463,8 @@ export default function SessionsPage() {
                     key={group.movie?.id}
                     group={group}
                     onSelect={selectSession}
+                    user={user}
+                    isAuthenticated={isAuthenticated}
                   />
                 ))}
               </div>

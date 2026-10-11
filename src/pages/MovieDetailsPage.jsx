@@ -150,8 +150,8 @@ export default function MovieDetailsPage() {
   }, [sessionsQuery.data]);
 
   useEffect(() => {
-    if (isAuthenticated && movie?.id) addRecentlyViewed(movie);
-  }, [isAuthenticated, movie?.id, addRecentlyViewed]);
+    if (movie?.id) addRecentlyViewed(movie);
+  }, [movie?.id, addRecentlyViewed]);
 
   useEffect(() => {
     if (location.hash !== "#movie-sessions" || movieQuery.isPending) return;
@@ -193,11 +193,26 @@ export default function MovieDetailsPage() {
 
   const ageCode = typeof age === "object" ? age?.code : age;
 
+  const minAge = Number(
+    age?.minAge ?? String(ageCode ?? "").match(/^(16|18)\+/)?.[1] ?? 0,
+  );
+  const birthDate = user?.dateOfBirth ? new Date(user.dateOfBirth) : null;
+  const today = new Date();
+  const calculatedAge =
+    birthDate && !Number.isNaN(birthDate.getTime())
+      ? today.getFullYear() -
+        birthDate.getFullYear() -
+        (today.getMonth() < birthDate.getMonth() ||
+        (today.getMonth() === birthDate.getMonth() &&
+          today.getDate() < birthDate.getDate())
+          ? 1
+          : 0)
+      : null;
   const ageRestricted =
     isAuthenticated &&
-    user?.age != null &&
-    age?.minAge != null &&
-    Number(user.age) < Number(age.minAge);
+    minAge >= 16 &&
+    calculatedAge !== null &&
+    calculatedAge < minAge;
 
   const formats = (movie.formats ?? [])
 
@@ -290,7 +305,8 @@ export default function MovieDetailsPage() {
 
           {ageRestricted && (
             <p className="md-warning">
-              You must be at least {age.minAge} to book this film.
+              This film is rated {minAge}+. You cannot buy tickets for it with
+              this account.
             </p>
           )}
 
